@@ -3,12 +3,14 @@ package io.schemacsv.query;
 import io.schemacsv.csv.*;
 import io.schemacsv.model.*;
 import io.schemacsv.schema.*;
+import io.schemacsv.index.*;
 import java.util.*;
 
 public final class QueryEngine {
     private final DataSet dataSet;
+    private final DataSetIndex index;
 
-    public QueryEngine(DataSet dataSet) { this.dataSet = Objects.requireNonNull(dataSet); }
+    public QueryEngine(DataSet dataSet) { this.dataSet = Objects.requireNonNull(dataSet); this.index=dataSet.index(); }
 
     public List<TableInfo> tables() {
         List<TableInfo> out = new ArrayList<>();
@@ -28,7 +30,7 @@ public final class QueryEngine {
         List<String> sort = sortColumns == null ? List.of() : List.copyOf(sortColumns);
         validateColumns(csv, sort);
 
-        List<CsvRecord> records = csv.records().stream().filter(r -> matches(csv, r, where)).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        List<CsvRecord> records = index.findExact(tableName, where).stream().filter(r -> matches(csv, r, where)).collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         if (!sort.isEmpty()) records.sort(comparator(csv, sort));
         List<QueryRow> out = new ArrayList<>();
         for (CsvRecord record : records) out.add(toRow(tableName, csv, record, projection));
@@ -70,6 +72,16 @@ public final class QueryEngine {
             }
         }
         return List.copyOf(out);
+    }
+
+    public List<IndexStats> indexStats() { return index.stats(); }
+
+    public String explainSelect(String tableName, Map<String,String> where) {
+        dataSet.requireTable(tableName);
+        if(where==null || where.isEmpty()) return "SCAN table="+tableName;
+        return index.bestIndex(tableName,where.keySet())
+                .map(s -> "INDEX table="+tableName+" name="+s.name()+" columns="+String.join(",",s.columns()))
+                .orElse("SCAN table="+tableName);
     }
 
     private static boolean matches(CsvTable csv, CsvRecord record, Map<String,String> where) {

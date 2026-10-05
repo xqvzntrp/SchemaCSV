@@ -3,6 +3,7 @@ package io.schemacsv.validation;
 import io.schemacsv.csv.*;
 import io.schemacsv.model.*;
 import io.schemacsv.schema.*;
+import io.schemacsv.index.DataSetIndex;
 import java.util.*;
 
 public final class ConstraintValidator {
@@ -28,42 +29,45 @@ public final class ConstraintValidator {
     }
 
     private static void validatePrimaryKeys(DataSet ds,List<ConstraintViolation> out) {
+        DataSetIndex indexes=ds.index();
         for(DataTable dt:ds.tables()) {
             PrimaryKeySchema pk=dt.schema().primaryKey(); if(pk==null)continue;
             if(pk.columns().stream().anyMatch(c->!dt.csv().hasColumn(c))) continue;
-            Map<Key,Integer> seen=new LinkedHashMap<>();
-            for(CsvRecord r:dt.csv().records()) {
-                Key key=key(dt.csv(),r,pk.columns());
-                if(key.parts().stream().anyMatch(String::isBlank)) { out.add(new ConstraintViolation("PRIMARY_KEY_NULL","Primary key '"+pk.name()+"' contains an empty value: "+key,dt.csv().path(),r.lineNumber())); continue; }
-                Integer first=seen.putIfAbsent(key,r.lineNumber());
-                if(first!=null) out.add(new ConstraintViolation("PRIMARY_KEY_DUPLICATE","Duplicate primary key '"+pk.name()+"' "+key+"; first seen at line "+first,dt.csv().path(),r.lineNumber()));
+            for(var e:indexes.groups(dt.schema().name(),pk.columns()).entrySet()) {
+                Key key=e.getKey(); List<CsvRecord> rows=e.getValue();
+                for(CsvRecord r:rows) if(key.parts().stream().anyMatch(String::isBlank))
+                    out.add(new ConstraintViolation("PRIMARY_KEY_NULL","Primary key '"+pk.name()+"' contains an empty value: "+key,dt.csv().path(),r.lineNumber()));
+                if(!key.parts().stream().anyMatch(String::isBlank) && rows.size()>1) {
+                    int first=rows.getFirst().lineNumber();
+                    for(int i=1;i<rows.size();i++) out.add(new ConstraintViolation("PRIMARY_KEY_DUPLICATE","Duplicate primary key '"+pk.name()+"' "+key+"; first seen at line "+first,dt.csv().path(),rows.get(i).lineNumber()));
+                }
             }
         }
     }
 
     private static void validateUniqueKeys(DataSet ds,List<ConstraintViolation> out) {
+        DataSetIndex indexes=ds.index();
         for(DataTable dt:ds.tables()) for(UniqueKeySchema uk:dt.schema().uniqueKeys()) {
             if(uk.columns().stream().anyMatch(c->!dt.csv().hasColumn(c))) continue;
-            Map<Key,Integer> seen=new LinkedHashMap<>();
-            for(CsvRecord r:dt.csv().records()) {
-                Key key=key(dt.csv(),r,uk.columns());
-                if(key.parts().stream().anyMatch(String::isBlank)) continue;
-                Integer first=seen.putIfAbsent(key,r.lineNumber());
-                if(first!=null) out.add(new ConstraintViolation("UNIQUE_KEY_DUPLICATE","Duplicate unique key '"+uk.name()+"' "+key+"; first seen at line "+first,dt.csv().path(),r.lineNumber()));
+            for(var e:indexes.groups(dt.schema().name(),uk.columns()).entrySet()) {
+                Key key=e.getKey(); List<CsvRecord> rows=e.getValue();
+                if(key.parts().stream().anyMatch(String::isBlank) || rows.size()<2) continue;
+                int first=rows.getFirst().lineNumber();
+                for(int i=1;i<rows.size();i++) out.add(new ConstraintViolation("UNIQUE_KEY_DUPLICATE","Duplicate unique key '"+uk.name()+"' "+key+"; first seen at line "+first,dt.csv().path(),rows.get(i).lineNumber()));
             }
         }
     }
 
     private static void validateForeignKeys(DataSet ds,List<ConstraintViolation> out) {
+        DataSetIndex indexes=ds.index();
         for(DataTable child:ds.tables()) for(ForeignKeySchema fk:child.schema().foreignKeys()) {
             DataTable parent=ds.requireTable(fk.referencedTable());
             if(fk.columns().stream().anyMatch(c->!child.csv().hasColumn(c)) || fk.referencedColumns().stream().anyMatch(c->!parent.csv().hasColumn(c))) continue;
-            Set<Key> parentKeys=new HashSet<>();
-            for(CsvRecord pr:parent.csv().records()) parentKeys.add(key(parent.csv(),pr,fk.referencedColumns()));
             for(CsvRecord cr:child.csv().records()) {
                 Key k=key(child.csv(),cr,fk.columns());
                 if(k.parts().stream().allMatch(String::isBlank)) continue;
-                if(!parentKeys.contains(k)) out.add(new ConstraintViolation("FOREIGN_KEY_MISSING_PARENT","Foreign key '"+fk.name()+"' "+k+" references "+fk.referencedTable()+"("+String.join(", ",fk.referencedColumns())+") but no matching parent row exists",child.csv().path(),cr.lineNumber()));
+                if(indexes.findByColumns(fk.referencedTable(),fk.referencedColumns(),k.parts()).isEmpty())
+                    out.add(new ConstraintViolation("FOREIGN_KEY_MISSING_PARENT","Foreign key '"+fk.name()+"' "+k+" references "+fk.referencedTable()+"("+String.join(", ",fk.referencedColumns())+") but no matching parent row exists",child.csv().path(),cr.lineNumber()));
             }
         }
     }
