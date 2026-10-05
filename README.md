@@ -6,7 +6,7 @@
 
 ## Status
 
-SchemaCSV v0.8.0 implements **Phase 6 — Schema Evolution**. It adds validated schema migrations and dataset/schema version metadata on top of the existing relational validation, editing, query/navigation, and interactive-editor engine.
+SchemaCSV v0.9.0 implements **Phase 7 — Defaults, Check Constraints, and Migration Audit**. It adds persistent insert defaults, declarative check constraints, and append-only migration history on top of the schema-evolution engine.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables and schema definitions
@@ -25,6 +25,9 @@ SchemaCSV v0.8.0 implements **Phase 6 — Schema Evolution**. It adds validated 
 - Read-only table/query/navigation commands
 - Interactive staged terminal editor with save/discard workflow
 - Immediate integrity validation for interactive mutations
+- Persistent defaults for future inserts
+- Declarative check constraints
+- Append-only migration audit history
 
 ## Quick start
 
@@ -38,7 +41,7 @@ Requires Java 21 or newer.
 Expected output:
 
 ```text
-SchemaCSV 0.8.0
+SchemaCSV 0.9.0
 tables=4 rows=5
 validation=OK
 ```
@@ -97,7 +100,11 @@ my-dataset/
 │   ├── columns.csv
 │   ├── primary_keys.csv
 │   ├── unique_keys.csv
-│   └── foreign_keys.csv
+│   ├── foreign_keys.csv
+│   ├── defaults.csv
+│   ├── check_constraints.csv
+│   ├── metadata.csv
+│   └── migrations.csv
 └── data/
     ├── channel.csv
     ├── category.csv
@@ -316,6 +323,35 @@ Schema changes are performed as migrations rather than manual edits. SchemaCSV s
 
 `schema/metadata.csv` tracks `schema_version` and `dataset_version`. Each successful migration advances both versions. Column renames automatically update primary keys, unique keys, local foreign-key columns, referenced foreign-key columns, and the affected data-file header. Table renames update all schema references while preserving the backing CSV filename.
 
+## v0.9.0 defaults, checks, and migration audit
+
+Defaults are schema metadata, not one-time backfill behavior. A default configured for a column is applied whenever a later insert omits that column.
+
+```bash
+./scripts/schemacsv migrate examples/basic set-default category name Unnamed
+```
+
+`add-column --default` now also records the default for future inserts:
+
+```bash
+./scripts/schemacsv migrate examples/basic add-column category status --required --default ACTIVE
+```
+
+Check constraints are declared in `schema/check_constraints.csv` and validated during normal validation, transaction commits, interactive editing, and migrations. Supported operators are `IN`, `MATCHES`, `MIN_LENGTH`, `MAX_LENGTH`, `NUMERIC_MIN`, and `NUMERIC_MAX`.
+
+```bash
+./scripts/schemacsv migrate examples/basic add-check category ck_category_code category_code MATCHES '[A-Z0-9_]+'
+./scripts/schemacsv migrate examples/basic add-check category ck_status status IN 'ACTIVE|INACTIVE'
+```
+
+Every successful schema migration is appended to `schema/migrations.csv` with its schema version, dataset version, operation, detail, and UTC timestamp.
+
+```bash
+./scripts/schemacsv history examples/basic
+```
+
+The audit log is append-only from SchemaCSV's migration API. A failed staged migration is discarded and does not create a history entry.
+
 ## Roadmap
 
 The roadmap describes the intended direction of the project and may change as the design evolves.
@@ -378,6 +414,16 @@ The roadmap describes the intended direction of the project and may change as th
 - Add unique constraints
 - Dataset and schema version metadata
 
+### Phase 7 — Defaults, Check Constraints, and Migration Audit ✅
+
+- Persistent schema defaults for future inserts
+- `set-default` schema migration
+- Declarative check constraints
+- Check enforcement in validation and editing
+- Append-only migration history
+- `history` CLI command
+- Rename propagation for default/check metadata
+
 ### Future possibilities
 
 - Desktop or web UI
@@ -394,14 +440,14 @@ Requires Java 21 or newer. The POM pins a modern Maven compiler plugin and compi
 
 ```bash
 mvn clean package
-java -jar target/schemacsv-0.8.0.jar validate examples/basic
+java -jar target/schemacsv-0.9.0.jar validate examples/basic
 ```
 
 ### Without Maven
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.8.0.jar validate examples/basic
+java -jar out/schemacsv-0.9.0.jar validate examples/basic
 ```
 
 ## License
