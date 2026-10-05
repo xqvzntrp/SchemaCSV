@@ -22,4 +22,9 @@ final class SchemaCsvTest {
     @Test void lookupFindsBusinessAwareRow() throws Exception { TestCases.lookupFindsBusinessAwareRow(repo); }
     @Test void referencesTraversesToParent() throws Exception { TestCases.referencesTraversesToParent(repo); }
     @Test void referencedByTraversesToChildren() throws Exception { TestCases.referencedByTraversesToChildren(repo); }
+    @Test void validatedMutationRollsBackInvalidEdit() throws Exception { TestCases.validatedMutationRollsBackInvalidEdit(repo); }
+    @Test void interactiveQuitDiscardsStagedChanges() throws Exception { TestCases.interactiveQuitDiscardsStagedChanges(repo); }
+    @Test void interactiveSavePersistsChanges() throws Exception { TestCases.interactiveSavePersistsChanges(repo); }
+    @Test void interactiveInvalidEditIsRejectedWithoutEndingSession() throws Exception { TestCases.interactiveInvalidEditIsRejectedWithoutEndingSession(repo); }
+    @Test void interactiveEditorSupportsQuotedValuesAndNavigation() throws Exception { TestCases.interactiveEditorSupportsQuotedValuesAndNavigation(repo); }
 }

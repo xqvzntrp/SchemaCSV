@@ -22,6 +22,11 @@ public final class TestRunner {
         test("lookup finds business-aware row", () -> TestCases.lookupFindsBusinessAwareRow(repo));
         test("references traverses to parent", () -> TestCases.referencesTraversesToParent(repo));
         test("referenced-by traverses to children", () -> TestCases.referencedByTraversesToChildren(repo));
+        test("validated mutation rolls back invalid edit", () -> TestCases.validatedMutationRollsBackInvalidEdit(repo));
+        test("interactive quit discards staged changes", () -> TestCases.interactiveQuitDiscardsStagedChanges(repo));
+        test("interactive save persists changes", () -> TestCases.interactiveSavePersistsChanges(repo));
+        test("interactive invalid edit is rejected without ending session", () -> TestCases.interactiveInvalidEditIsRejectedWithoutEndingSession(repo));
+        test("interactive editor supports quoted values and navigation", () -> TestCases.interactiveEditorSupportsQuotedValuesAndNavigation(repo));
         System.out.printf("TESTS: %d passed, 0 failed, %d total%n", passed, passed);
     }
 

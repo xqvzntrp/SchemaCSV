@@ -4,6 +4,8 @@ import io.schemacsv.edit.*;
 import io.schemacsv.model.*;
 import io.schemacsv.validation.*;
 import io.schemacsv.query.*;
+import io.schemacsv.tui.TerminalEditor;
+import java.io.*;
 
 import java.nio.file.*;
 import java.util.*;
@@ -151,6 +153,71 @@ public final class TestCases {
         var rows = q.referencedBy("category", Map.of("category_key", "100"));
         check(rows.size() == 2, "expected two referencing fields");
         check(rows.stream().allMatch(r -> r.row().table().equals("field")), "expected only field children");
+    }
+
+
+    public static void validatedMutationRollsBackInvalidEdit(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            var db = EditableDataSet.load(root);
+            try (var tx = db.beginTransaction()) {
+                boolean failed = false;
+                try { tx.insertValidated("field", Map.of("field_key","9999","category_key","999","field_code","bad","name","Bad")); }
+                catch (EditException e) { failed = true; }
+                check(failed, "expected immediate integrity failure");
+                check(new QueryEngine(tx.snapshot()).select("field", Map.of(), List.of(), List.of()).size() == 2,
+                        "failed edit should be rolled back from staged state");
+                check(tx.validate().valid(), "staged transaction should remain valid");
+            }
+        });
+    }
+
+    public static void interactiveQuitDiscardsStagedChanges(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            String input = "use category\nedit category_key=100 --set category_code=TEMP_CODE\nquit\n";
+            var stdout = new StringWriter(); var stderr = new StringWriter();
+            int code = new TerminalEditor(root, new StringReader(input), stdout, stderr).run();
+            check(code == 0, "editor should exit cleanly");
+            var row = new QueryEngine(DataSetLoader.load(root)).lookup("category", Map.of("category_key","100"));
+            check(row.values().get("category_code").equals("SECTIONALS_306"), "quit must discard staged edits");
+            check(stdout.toString().contains("staged changes discarded"), "quit should explain rollback");
+        });
+    }
+
+    public static void interactiveSavePersistsChanges(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            String input = "use category\nedit category_key=100 --set category_code=SECTIONALS_307\nvalidate\nsave\n";
+            var stdout = new StringWriter(); var stderr = new StringWriter();
+            new TerminalEditor(root, new StringReader(input), stdout, stderr).run();
+            var row = new QueryEngine(DataSetLoader.load(root)).lookup("category", Map.of("category_key","100"));
+            check(row.values().get("category_code").equals("SECTIONALS_307"), "save should persist staged code rename");
+            check(stdout.toString().contains("validation=OK"), "interactive validation should pass");
+            check(stdout.toString().contains("SAVE OK"), "save should confirm success");
+        });
+    }
+
+    public static void interactiveInvalidEditIsRejectedWithoutEndingSession(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            String input = "use field\nadd field_key=9999 category_key=999 field_code=bad name=Bad\nvalidate\nsave\n";
+            var stdout = new StringWriter(); var stderr = new StringWriter();
+            new TerminalEditor(root, new StringReader(input), stdout, stderr).run();
+            check(stderr.toString().contains("Edit violates constraints"), "invalid interactive edit should report integrity error");
+            check(stdout.toString().contains("validation=OK"), "session should remain valid after rejected edit");
+            var rows = new QueryEngine(DataSetLoader.load(root)).select("field", Map.of(), List.of(), List.of());
+            check(rows.size() == 2, "rejected edit must not be saved");
+        });
+    }
+
+    public static void interactiveEditorSupportsQuotedValuesAndNavigation(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            String input = "use category\nedit category_key=100 --set name=\"Living Room Sectionals\"\nchildren category_key=100\nrows category_key=100\nsave\n";
+            var stdout = new StringWriter(); var stderr = new StringWriter();
+            new TerminalEditor(root, new StringReader(input), stdout, stderr).run();
+            check(stderr.toString().isEmpty(), "quoted edit should not produce errors: " + stderr);
+            check(stdout.toString().contains("relationships=2"), "children navigation should find two fields");
+            check(stdout.toString().contains("Living Room Sectionals"), "staged row browsing should show quoted value");
+            var row = new QueryEngine(DataSetLoader.load(root)).lookup("category", Map.of("category_key","100"));
+            check(row.values().get("name").equals("Living Room Sectionals"), "quoted value should persist");
+        });
     }
 
 
