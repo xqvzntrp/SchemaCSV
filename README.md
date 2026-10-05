@@ -243,6 +243,22 @@ Exit codes:
 
 v0.5.0 keeps the Phase 3 feature set unchanged and fixes Maven test discovery. The project now has a JUnit 5/Surefire test surface and a dependency-free test runner backed by the same 10 shared test cases. See `PHASE-3.2.md` for the maintenance-release acceptance criteria.
 
+## v0.6.0 query and navigation
+
+v0.6.0 implements Phase 4 with read-only relational exploration. SchemaCSV can now inspect tables, filter/project/sort rows, look up individual records, follow declared foreign keys to parent rows, and find rows that reference a selected record. See `PHASE-4.md` for command examples and acceptance criteria.
+
+### Query examples
+
+```bash
+./scripts/schemacsv tables examples/basic
+./scripts/schemacsv select examples/basic field --where category_key=100 --columns field_code,name --sort field_code
+./scripts/schemacsv lookup examples/basic category category_code=SECTIONALS_306
+./scripts/schemacsv references examples/basic value value_key=10000
+./scripts/schemacsv referenced-by examples/basic category category_key=100
+```
+
+The query CLI intentionally uses small composable commands rather than a SQL parser. In v0.6.0, filters are exact string matches and sort order is ascending.
+
 ## Roadmap
 
 The roadmap describes the intended direction of the project and may change as the design evolves.
@@ -275,7 +291,7 @@ The roadmap describes the intended direction of the project and may change as th
 - Keep code renames independent from relational-key changes
 - Preserve cascading behavior for true key changes
 
-### Phase 4 — Query and Navigation
+### Phase 4 — Query and Navigation ✅
 
 - Table inspection
 - Filtering and lookup
