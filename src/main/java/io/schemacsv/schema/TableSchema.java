@@ -3,9 +3,11 @@ package io.schemacsv.schema;
 import java.util.*;
 
 public record TableSchema(String name, String file, List<ColumnSchema> columns,
-                          PrimaryKeySchema primaryKey, List<ForeignKeySchema> foreignKeys) {
+                          PrimaryKeySchema primaryKey, List<UniqueKeySchema> uniqueKeys,
+                          List<ForeignKeySchema> foreignKeys) {
     public TableSchema {
         columns = List.copyOf(columns);
+        uniqueKeys = List.copyOf(uniqueKeys);
         foreignKeys = List.copyOf(foreignKeys);
     }
 

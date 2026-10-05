@@ -12,6 +12,7 @@ public final class ConstraintValidator {
         List<ConstraintViolation> out=new ArrayList<>();
         validateHeadersAndRequired(ds,out);
         validatePrimaryKeys(ds,out);
+        validateUniqueKeys(ds,out);
         validateForeignKeys(ds,out);
         return new ValidationResult(out);
     }
@@ -35,6 +36,19 @@ public final class ConstraintValidator {
                 if(key.parts().stream().anyMatch(String::isBlank)) { out.add(new ConstraintViolation("PRIMARY_KEY_NULL","Primary key '"+pk.name()+"' contains an empty value: "+key,dt.csv().path(),r.lineNumber())); continue; }
                 Integer first=seen.putIfAbsent(key,r.lineNumber());
                 if(first!=null) out.add(new ConstraintViolation("PRIMARY_KEY_DUPLICATE","Duplicate primary key '"+pk.name()+"' "+key+"; first seen at line "+first,dt.csv().path(),r.lineNumber()));
+            }
+        }
+    }
+
+    private static void validateUniqueKeys(DataSet ds,List<ConstraintViolation> out) {
+        for(DataTable dt:ds.tables()) for(UniqueKeySchema uk:dt.schema().uniqueKeys()) {
+            if(uk.columns().stream().anyMatch(c->!dt.csv().hasColumn(c))) continue;
+            Map<Key,Integer> seen=new LinkedHashMap<>();
+            for(CsvRecord r:dt.csv().records()) {
+                Key key=key(dt.csv(),r,uk.columns());
+                if(key.parts().stream().anyMatch(String::isBlank)) continue;
+                Integer first=seen.putIfAbsent(key,r.lineNumber());
+                if(first!=null) out.add(new ConstraintViolation("UNIQUE_KEY_DUPLICATE","Duplicate unique key '"+uk.name()+"' "+key+"; first seen at line "+first,dt.csv().path(),r.lineNumber()));
             }
         }
     }
