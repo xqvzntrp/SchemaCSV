@@ -6,7 +6,7 @@
 
 ## Status
 
-SchemaCSV v0.7.0 implements **Phase 5 — Interactive Editor**. It adds a staged terminal editing workflow on top of the existing validation, mutation, persistence, and query/navigation engine.
+SchemaCSV v0.8.0 implements **Phase 6 — Schema Evolution**. It adds validated schema migrations and dataset/schema version metadata on top of the existing relational validation, editing, query/navigation, and interactive-editor engine.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables and schema definitions
@@ -38,7 +38,7 @@ Requires Java 21 or newer.
 Expected output:
 
 ```text
-SchemaCSV 0.7.0
+SchemaCSV 0.8.0
 tables=4 rows=5
 validation=OK
 ```
@@ -302,6 +302,20 @@ quit
 
 Quoted values are supported for spaces. Relationship navigation is evaluated against the staged transaction, so newly edited data is visible before save.
 
+## v0.8.0 schema evolution
+
+Schema changes are performed as migrations rather than manual edits. SchemaCSV stages a complete schema/data copy, rewrites dependent metadata and CSV headers, reloads and validates the staged dataset, and only then replaces the live schema/data directories.
+
+```bash
+./scripts/schemacsv version examples/basic
+./scripts/schemacsv migrate examples/basic rename-table field attribute
+./scripts/schemacsv migrate examples/basic rename-column field field_key field_id
+./scripts/schemacsv migrate examples/basic add-column category status --required --default ACTIVE
+./scripts/schemacsv migrate examples/basic add-unique field uq_field_name category_key,name
+```
+
+`schema/metadata.csv` tracks `schema_version` and `dataset_version`. Each successful migration advances both versions. Column renames automatically update primary keys, unique keys, local foreign-key columns, referenced foreign-key columns, and the affected data-file header. Table renames update all schema references while preserving the backing CSV filename.
+
 ## Roadmap
 
 The roadmap describes the intended direction of the project and may change as the design evolves.
@@ -355,14 +369,14 @@ The roadmap describes the intended direction of the project and may change as th
 - Immediate validation feedback
 - Safe save and rollback workflow
 
-### Phase 6 — Schema Evolution
+### Phase 6 — Schema Evolution ✅
 
-- Schema migrations
+- Validated staged schema migrations
 - Rename columns and tables
-- Key migration support
-- Default values
-- Additional constraints
-- Dataset version metadata
+- Key/FK/unique metadata migration support
+- Add columns with defaults and required-value semantics
+- Add unique constraints
+- Dataset and schema version metadata
 
 ### Future possibilities
 
@@ -380,14 +394,14 @@ Requires Java 21 or newer. The POM pins a modern Maven compiler plugin and compi
 
 ```bash
 mvn clean package
-java -jar target/schemacsv-0.7.0.jar validate examples/basic
+java -jar target/schemacsv-0.8.0.jar validate examples/basic
 ```
 
 ### Without Maven
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.7.0.jar validate examples/basic
+java -jar out/schemacsv-0.8.0.jar validate examples/basic
 ```
 
 ## License
