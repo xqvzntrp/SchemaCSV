@@ -33,6 +33,24 @@ public final class Transaction implements AutoCloseable {
 
     public ValidationResult validate(){ ensureOpen(); return ConstraintValidator.validate(owner.snapshot(rows)); }
 
+    /** Returns a read-only dataset snapshot of the current staged transaction state. */
+    public DataSet snapshot(){ ensureOpen(); return owner.snapshot(rows); }
+
+    /** Insert and keep the change only when the staged dataset remains valid. */
+    public Transaction insertValidated(String table, Map<String,String> values){
+        return validatedMutation(() -> insert(table, values));
+    }
+
+    /** Update and keep the change only when the staged dataset remains valid. */
+    public Transaction updateValidated(String table, Map<String,String> key, Map<String,String> changes){
+        return validatedMutation(() -> update(table, key, changes));
+    }
+
+    /** Delete and keep the change only when the staged dataset remains valid. */
+    public Transaction deleteValidated(String table, Map<String,String> key, DeleteRule rule){
+        return validatedMutation(() -> delete(table, key, rule));
+    }
+
     public void commit(){
         ensureOpen(); ValidationResult result=validate();
         if(!result.valid()) throw new EditException("Transaction violates constraints: "+result.violations().getFirst());
@@ -77,6 +95,20 @@ public final class Transaction implements AutoCloseable {
             }
             if(!dependent.isEmpty() && rule==DeleteRule.RESTRICT) throw new EditException("Delete restricted: "+dependent.size()+" row(s) in "+child.name()+" reference "+parent.name());
             if(rule==DeleteRule.CASCADE) for(var d:dependent){ deleteReferenced(child,d,rule,seen); rows.get(child.name()).remove(d); }
+        }
+    }
+
+    private Transaction validatedMutation(Runnable mutation){
+        ensureOpen();
+        var before = EditableDataSet.deepCopy(rows);
+        try {
+            mutation.run();
+            ValidationResult result = validate();
+            if(!result.valid()) throw new EditException("Edit violates constraints: "+result.violations().getFirst());
+            return this;
+        } catch(RuntimeException e) {
+            rows.clear(); rows.putAll(before);
+            throw e;
         }
     }
 
