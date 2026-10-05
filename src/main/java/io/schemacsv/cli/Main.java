@@ -7,7 +7,7 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-    private static final String VERSION="0.4.0";
+    private static final String VERSION="0.5.0";
     public static void main(String[] args) { int code=run(args,System.out,System.err); if(code!=0) System.exit(code); }
 
     static int run(String[] args, java.io.PrintStream out, java.io.PrintStream err) {

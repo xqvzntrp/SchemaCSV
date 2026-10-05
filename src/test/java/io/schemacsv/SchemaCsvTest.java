@@ -1,0 +1,20 @@
+package io.schemacsv;
+
+import org.junit.jupiter.api.Test;
+
+import java.nio.file.Path;
+
+final class SchemaCsvTest {
+    private final Path repo = Path.of(System.getProperty("schemacsv.root", ".")).toAbsolutePath().normalize();
+
+    @Test void validExamplePasses() throws Exception { TestCases.validExamplePasses(repo); }
+    @Test void invalidForeignKeyIsDetected() throws Exception { TestCases.invalidForeignKeyIsDetected(repo); }
+    @Test void primaryKeysUseStableKeyColumns() throws Exception { TestCases.primaryKeysUseStableKeyColumns(repo); }
+    @Test void businessCodesHaveScopedUniqueConstraints() throws Exception { TestCases.businessCodesHaveScopedUniqueConstraints(repo); }
+    @Test void duplicateBusinessCodeIsRejected() throws Exception { TestCases.duplicateBusinessCodeIsRejected(repo); }
+    @Test void invalidInsertIsRejectedAtCommit() throws Exception { TestCases.invalidInsertIsRejectedAtCommit(repo); }
+    @Test void businessCodeRenameDoesNotChangeRelationalKeys() throws Exception { TestCases.businessCodeRenameDoesNotChangeRelationalKeys(repo); }
+    @Test void trueKeyRenameCascadesToForeignKeys() throws Exception { TestCases.trueKeyRenameCascadesToForeignKeys(repo); }
+    @Test void restrictBlocksParentDelete() throws Exception { TestCases.restrictBlocksParentDelete(repo); }
+    @Test void cascadeDeleteRemovesDependentRows() throws Exception { TestCases.cascadeDeleteRemovesDependentRows(repo); }
+}
