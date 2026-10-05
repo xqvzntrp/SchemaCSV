@@ -4,11 +4,13 @@ import io.schemacsv.edit.*;
 import io.schemacsv.model.*;
 import io.schemacsv.validation.*;
 import io.schemacsv.query.*;
+import io.schemacsv.tui.TerminalEditor;
+import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-    private static final String VERSION="0.6.0";
+    private static final String VERSION="0.7.0";
     public static void main(String[] args) { int code=run(args,System.out,System.err); if(code!=0) System.exit(code); }
 
     static int run(String[] args, java.io.PrintStream out, java.io.PrintStream err) {
@@ -25,6 +27,7 @@ public final class Main {
                 case "lookup" -> lookup(root,out,args);
                 case "references" -> references(root,out,args);
                 case "referenced-by" -> referencedBy(root,out,args);
+                case "edit-ui" -> interactiveEdit(root,out,err,args);
                 default -> { usage(err); yield 2; }
             };
         } catch(Exception e) { err.println("ERROR: "+e.getMessage()); return 2; }
@@ -120,6 +123,12 @@ public final class Main {
         return 0;
     }
 
+
+    private static int interactiveEdit(Path root, java.io.PrintStream out, java.io.PrintStream err, String[] args) throws Exception {
+        if (args.length != 2) throw new IllegalArgumentException("edit-ui accepts only <dataset-directory>");
+        return new TerminalEditor(root, new InputStreamReader(System.in), new OutputStreamWriter(out), new OutputStreamWriter(err)).run();
+    }
+
     private static void printRows(java.io.PrintStream out, List<QueryRow> rows, List<String> requestedColumns) {
         if (rows.isEmpty()) { out.println("rows=0"); return; }
         List<String> columns = requestedColumns == null || requestedColumns.isEmpty() ? new ArrayList<>(rows.getFirst().values().keySet()) : requestedColumns;
@@ -166,5 +175,6 @@ public final class Main {
         err.println("  schemacsv lookup <dataset-directory> <table> column=value...");
         err.println("  schemacsv references <dataset-directory> <table> column=value...");
         err.println("  schemacsv referenced-by <dataset-directory> <table> column=value...");
+        err.println("  schemacsv edit-ui <dataset-directory>");
     }
 }
