@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-JAR="$ROOT/out/schemacsv-0.3.0.jar"
+JAR="$ROOT/out/schemacsv-0.4.0.jar"
 [[ -f "$JAR" ]] || "$ROOT/scripts/build.sh" >/dev/null
 exec java -jar "$JAR" "$@"
