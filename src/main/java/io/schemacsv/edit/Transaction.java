@@ -58,7 +58,11 @@ public final class Transaction implements AutoCloseable {
             if(!referencedChanged) continue;
             for(LinkedHashMap<String,String> childRow:rows.get(child.name())) {
                 boolean match=true; for(int i=0;i<fk.columns().size();i++) if(!Objects.equals(childRow.get(fk.columns().get(i)),oldRow.get(fk.referencedColumns().get(i)))) {match=false;break;}
-                if(match) for(int i=0;i<fk.columns().size();i++) childRow.put(fk.columns().get(i),newRow.get(fk.referencedColumns().get(i)));
+                if(match) {
+                    Map<String,String> oldChild=new LinkedHashMap<>(childRow);
+                    for(int i=0;i<fk.columns().size();i++) childRow.put(fk.columns().get(i),newRow.get(fk.referencedColumns().get(i)));
+                    propagateKeyChange(child,oldChild,childRow);
+                }
             }
         }
     }
