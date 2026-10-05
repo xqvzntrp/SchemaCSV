@@ -6,7 +6,7 @@
 
 ## Status
 
-SchemaCSV v0.4.0 implements **Phase 3 — Relational Identity Refinement** on top of the Phase 1 validator and Phase 2 editing/persistence engine.
+SchemaCSV v0.5.0 is a **test-integration maintenance release** on top of Phase 3. It keeps the Phase 3 relational identity model and makes the project test suite first-class under Maven/JUnit 5.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables and schema definitions
@@ -35,7 +35,7 @@ Requires Java 21 or newer.
 Expected output:
 
 ```text
-SchemaCSV 0.4.0
+SchemaCSV 0.5.0
 tables=4 rows=5
 validation=OK
 ```
@@ -239,6 +239,10 @@ Exit codes:
 7. **Writes are validated before replacement.** Staged CSV output is reloaded and validated before becoming live data.
 8. **The core stays generic.** SchemaCSV does not know about channels, products, or any particular business domain.
 
+## v0.5.0 test integration
+
+v0.5.0 keeps the Phase 3 feature set unchanged and fixes Maven test discovery. The project now has a JUnit 5/Surefire test surface and a dependency-free test runner backed by the same 10 shared test cases. See `PHASE-3.2.md` for the maintenance-release acceptance criteria.
+
 ## Roadmap
 
 The roadmap describes the intended direction of the project and may change as the design evolves.
@@ -314,14 +318,14 @@ Requires Java 21 or newer. The POM pins a modern Maven compiler plugin and compi
 
 ```bash
 mvn clean package
-java -jar target/schemacsv-0.4.0.jar validate examples/basic
+java -jar target/schemacsv-0.5.0.jar validate examples/basic
 ```
 
 ### Without Maven
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.4.0.jar validate examples/basic
+java -jar out/schemacsv-0.5.0.jar validate examples/basic
 ```
 
 ## License
