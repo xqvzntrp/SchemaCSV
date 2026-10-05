@@ -6,7 +6,7 @@
 
 ## Status
 
-SchemaCSV v0.5.0 is a **test-integration maintenance release** on top of Phase 3. It keeps the Phase 3 relational identity model and makes the project test suite first-class under Maven/JUnit 5.
+SchemaCSV v0.7.0 implements **Phase 5 — Interactive Editor**. It adds a staged terminal editing workflow on top of the existing validation, mutation, persistence, and query/navigation engine.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables and schema definitions
@@ -22,6 +22,9 @@ SchemaCSV v0.5.0 is a **test-integration maintenance release** on top of Phase 3
 - Atomic replacement of the `data/` directory
 - Reload-after-save validation
 - File and row diagnostics
+- Read-only table/query/navigation commands
+- Interactive staged terminal editor with save/discard workflow
+- Immediate integrity validation for interactive mutations
 
 ## Quick start
 
@@ -35,7 +38,7 @@ Requires Java 21 or newer.
 Expected output:
 
 ```text
-SchemaCSV 0.5.0
+SchemaCSV 0.7.0
 tables=4 rows=5
 validation=OK
 ```
@@ -259,6 +262,46 @@ v0.6.0 implements Phase 4 with read-only relational exploration. SchemaCSV can n
 
 The query CLI intentionally uses small composable commands rather than a SQL parser. In v0.6.0, filters are exact string matches and sort order is ascending.
 
+## v0.7.0 interactive editor
+
+v0.7.0 implements Phase 5 with a line-oriented terminal editor. Interactive edits are staged in memory and are not written to CSV until `save`. `quit` or end-of-file discards the staged transaction. Each `add`, `edit`, and `delete` command is validated immediately; an invalid command is rolled back without ending the session.
+
+Start the editor:
+
+```bash
+./scripts/schemacsv edit-ui examples/basic
+```
+
+Example session:
+
+```text
+schemacsv> tables
+schemacsv> use category
+schemacsv[category]> rows category_key=100
+schemacsv[category]> edit category_key=100 --set name="Living Room Sectionals"
+schemacsv[category]> children category_key=100
+schemacsv[category]> validate
+schemacsv[category]> save
+```
+
+Editor commands:
+
+```text
+tables
+use <table>
+rows [column=value ...]
+add column=value ...
+edit column=value ... --set column=value ...
+delete [--cascade] column=value ...
+refs column=value ...
+children column=value ...
+validate
+save
+quit
+```
+
+Quoted values are supported for spaces. Relationship navigation is evaluated against the staged transaction, so newly edited data is visible before save.
+
 ## Roadmap
 
 The roadmap describes the intended direction of the project and may change as the design evolves.
@@ -272,6 +315,9 @@ The roadmap describes the intended direction of the project and may change as th
 - Required-value validation
 - Validation CLI
 - File and row diagnostics
+- Read-only table/query/navigation commands
+- Interactive staged terminal editor with save/discard workflow
+- Immediate integrity validation for interactive mutations
 
 ### Phase 2 — Safe Editing and Persistence ✅
 
@@ -300,12 +346,12 @@ The roadmap describes the intended direction of the project and may change as th
 - Sorting and projection
 - Richer CLI exploration commands
 
-### Phase 5 — Interactive Editor
+### Phase 5 — Interactive Editor ✅
 
 - Interactive terminal UI
 - Table and record browsing
 - Record editing
-- Relationship-aware selectors
+- Relationship-aware navigation
 - Immediate validation feedback
 - Safe save and rollback workflow
 
@@ -334,14 +380,14 @@ Requires Java 21 or newer. The POM pins a modern Maven compiler plugin and compi
 
 ```bash
 mvn clean package
-java -jar target/schemacsv-0.5.0.jar validate examples/basic
+java -jar target/schemacsv-0.7.0.jar validate examples/basic
 ```
 
 ### Without Maven
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.5.0.jar validate examples/basic
+java -jar out/schemacsv-0.7.0.jar validate examples/basic
 ```
 
 ## License
