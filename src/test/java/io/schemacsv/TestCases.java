@@ -339,6 +339,41 @@ public final class TestCases {
     }
 
 
+    public static void indexCatalogCoversRelationalConstraints(Path repo) throws Exception {
+        var ds=DataSetLoader.load(repo.resolve("examples/basic"));
+        var stats=ds.index().stats();
+        check(stats.size()==11,"expected 11 physical constraint indexes, got "+stats.size());
+        check(stats.stream().anyMatch(i->i.table().equals("category")&&i.name().equals("pk_category")&&i.kind().equals("PRIMARY")),"category PK index missing");
+        check(stats.stream().anyMatch(i->i.table().equals("field")&&i.columns().equals(List.of("category_key"))),"field FK child index missing");
+    }
+
+    public static void explainUsesPrimaryKeyIndex(Path repo) throws Exception {
+        var q=new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        String plan=q.explainSelect("field",Map.of("field_key","1000"));
+        check(plan.contains("INDEX")&&plan.contains("pk_field"),"expected PK index plan, got "+plan);
+    }
+
+    public static void explainUsesForeignKeyIndex(Path repo) throws Exception {
+        var q=new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        String plan=q.explainSelect("field",Map.of("category_key","100"));
+        check(plan.contains("INDEX")&&plan.contains("category_key"),"expected FK index plan, got "+plan);
+    }
+
+    public static void explainFallsBackToScanForUnindexedColumn(Path repo) throws Exception {
+        var q=new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        String plan=q.explainSelect("field",Map.of("name","Brand"));
+        check(plan.startsWith("SCAN"),"expected scan plan for unindexed name, got "+plan);
+    }
+
+    public static void indexedQueriesPreserveResults(Path repo) throws Exception {
+        var q=new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        var rows=q.select("field",Map.of("category_key","100"),List.of("field_key","field_code"),List.of("field_key"));
+        check(rows.size()==2,"expected two indexed field rows");
+        check(rows.getFirst().values().get("field_key").equals("1000"),"expected deterministic indexed result ordering after sort");
+        check(q.references("value",Map.of("value_key","10000")).getFirst().row().table().equals("field"),"indexed parent traversal should preserve relationship result");
+    }
+
+
     private static void withCopy(Path source, ThrowingPath body) throws Exception {
         Path tmp = Files.createTempDirectory("schemacsv-test-");
         copyTree(source, tmp);

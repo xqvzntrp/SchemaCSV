@@ -37,6 +37,11 @@ public final class TestRunner {
         test("check constraint rejects invalid edit", () -> TestCases.checkConstraintRejectsInvalidEdit(repo));
         test("migration history records operations", () -> TestCases.migrationHistoryRecordsOperations(repo));
         test("rename column propagates default and check metadata", () -> TestCases.renameColumnPropagatesDefaultAndCheckMetadata(repo));
+        test("index catalog covers relational constraints", () -> TestCases.indexCatalogCoversRelationalConstraints(repo));
+        test("explain uses primary key index", () -> TestCases.explainUsesPrimaryKeyIndex(repo));
+        test("explain uses foreign key index", () -> TestCases.explainUsesForeignKeyIndex(repo));
+        test("explain falls back to scan for unindexed column", () -> TestCases.explainFallsBackToScanForUnindexedColumn(repo));
+        test("indexed queries preserve results", () -> TestCases.indexedQueriesPreserveResults(repo));
         System.out.printf("TESTS: %d passed, 0 failed, %d total%n", passed, passed);
     }
 

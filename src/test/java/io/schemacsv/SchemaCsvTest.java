@@ -37,4 +37,9 @@ final class SchemaCsvTest {
     @Test void checkConstraintRejectsInvalidEdit() throws Exception { TestCases.checkConstraintRejectsInvalidEdit(repo); }
     @Test void migrationHistoryRecordsOperations() throws Exception { TestCases.migrationHistoryRecordsOperations(repo); }
     @Test void renameColumnPropagatesDefaultAndCheckMetadata() throws Exception { TestCases.renameColumnPropagatesDefaultAndCheckMetadata(repo); }
+    @Test void indexCatalogCoversRelationalConstraints() throws Exception { TestCases.indexCatalogCoversRelationalConstraints(repo); }
+    @Test void explainUsesPrimaryKeyIndex() throws Exception { TestCases.explainUsesPrimaryKeyIndex(repo); }
+    @Test void explainUsesForeignKeyIndex() throws Exception { TestCases.explainUsesForeignKeyIndex(repo); }
+    @Test void explainFallsBackToScanForUnindexedColumn() throws Exception { TestCases.explainFallsBackToScanForUnindexedColumn(repo); }
+    @Test void indexedQueriesPreserveResults() throws Exception { TestCases.indexedQueriesPreserveResults(repo); }
 }
