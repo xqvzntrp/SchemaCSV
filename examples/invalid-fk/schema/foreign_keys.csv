@@ -1,7 +1,4 @@
 table_name,key_name,column_name,position,referenced_table,referenced_column
-category,fk_category_channel,channel_code,1,channel,code
-field,fk_field_category,channel_code,1,category,channel_code
-field,fk_field_category,category_code,2,category,code
-value,fk_value_field,channel_code,1,field,channel_code
-value,fk_value_field,category_code,2,field,category_code
-value,fk_value_field,field_code,3,field,code
+category,fk_category_channel,channel_key,1,channel,channel_key
+field,fk_field_category,category_key,1,category,category_key
+value,fk_value_field,field_key,1,field,field_key

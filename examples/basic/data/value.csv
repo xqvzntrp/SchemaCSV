@@ -1,2 +1,2 @@
-channel_code,category_code,field_code,record_key,value
-WAYFAIR,SECTIONALS_306,core::supplier_part_number,ASTON,ASTON
+value_key,field_key,record_code,value
+10000,1000,ASTON,ASTON
