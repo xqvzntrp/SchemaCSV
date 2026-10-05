@@ -3,6 +3,7 @@ package io.schemacsv;
 import io.schemacsv.edit.*;
 import io.schemacsv.model.*;
 import io.schemacsv.validation.*;
+import io.schemacsv.query.*;
 
 import java.nio.file.*;
 import java.util.*;
@@ -113,6 +114,45 @@ public final class TestCases {
             check(ds.requireTable("value").csv().records().isEmpty(), "values should cascade");
         });
     }
+
+    public static void tableInspectionReportsSchemaAndCounts(Path repo) throws Exception {
+        var q = new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        var tables = q.tables();
+        check(tables.size() == 4, "expected four tables");
+        var field = tables.stream().filter(t -> t.name().equals("field")).findFirst().orElseThrow();
+        check(field.rows() == 2, "expected two field rows");
+        check(field.primaryKeyColumns().equals(List.of("field_key")), "expected field_key primary key");
+    }
+
+    public static void selectSupportsFilterProjectionAndSort(Path repo) throws Exception {
+        var q = new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        var rows = q.select("field", Map.of("category_key", "100"), List.of("field_code", "name"), List.of("field_code"));
+        check(rows.size() == 2, "expected two selected fields");
+        check(rows.getFirst().values().keySet().equals(new LinkedHashSet<>(List.of("field_code", "name"))), "projection order should be preserved");
+        check(rows.getFirst().values().get("field_code").equals("core::brand"), "sort should put brand first");
+    }
+
+    public static void lookupFindsBusinessAwareRow(Path repo) throws Exception {
+        var q = new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        var row = q.lookup("category", Map.of("category_code", "SECTIONALS_306"));
+        check(row.values().get("category_key").equals("100"), "lookup should return category key 100");
+    }
+
+    public static void referencesTraversesToParent(Path repo) throws Exception {
+        var q = new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        var rows = q.references("value", Map.of("value_key", "10000"));
+        check(rows.size() == 1, "expected one parent reference");
+        check(rows.getFirst().row().table().equals("field"), "value should reference field");
+        check(rows.getFirst().row().values().get("field_key").equals("1000"), "expected field 1000");
+    }
+
+    public static void referencedByTraversesToChildren(Path repo) throws Exception {
+        var q = new QueryEngine(DataSetLoader.load(repo.resolve("examples/basic")));
+        var rows = q.referencedBy("category", Map.of("category_key", "100"));
+        check(rows.size() == 2, "expected two referencing fields");
+        check(rows.stream().allMatch(r -> r.row().table().equals("field")), "expected only field children");
+    }
+
 
     private static void withCopy(Path source, ThrowingPath body) throws Exception {
         Path tmp = Files.createTempDirectory("schemacsv-test-");

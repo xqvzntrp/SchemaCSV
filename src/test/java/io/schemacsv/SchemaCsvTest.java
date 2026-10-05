@@ -17,4 +17,9 @@ final class SchemaCsvTest {
     @Test void trueKeyRenameCascadesToForeignKeys() throws Exception { TestCases.trueKeyRenameCascadesToForeignKeys(repo); }
     @Test void restrictBlocksParentDelete() throws Exception { TestCases.restrictBlocksParentDelete(repo); }
     @Test void cascadeDeleteRemovesDependentRows() throws Exception { TestCases.cascadeDeleteRemovesDependentRows(repo); }
+    @Test void tableInspectionReportsSchemaAndCounts() throws Exception { TestCases.tableInspectionReportsSchemaAndCounts(repo); }
+    @Test void selectSupportsFilterProjectionAndSort() throws Exception { TestCases.selectSupportsFilterProjectionAndSort(repo); }
+    @Test void lookupFindsBusinessAwareRow() throws Exception { TestCases.lookupFindsBusinessAwareRow(repo); }
+    @Test void referencesTraversesToParent() throws Exception { TestCases.referencesTraversesToParent(repo); }
+    @Test void referencedByTraversesToChildren() throws Exception { TestCases.referencedByTraversesToChildren(repo); }
 }
