@@ -5,12 +5,13 @@ import io.schemacsv.model.*;
 import io.schemacsv.validation.*;
 import io.schemacsv.query.*;
 import io.schemacsv.tui.TerminalEditor;
+import io.schemacsv.migration.*;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-    private static final String VERSION="0.7.0";
+    private static final String VERSION="0.8.0";
     public static void main(String[] args) { int code=run(args,System.out,System.err); if(code!=0) System.exit(code); }
 
     static int run(String[] args, java.io.PrintStream out, java.io.PrintStream err) {
@@ -28,6 +29,8 @@ public final class Main {
                 case "references" -> references(root,out,args);
                 case "referenced-by" -> referencedBy(root,out,args);
                 case "edit-ui" -> interactiveEdit(root,out,err,args);
+                case "version" -> version(root,out,args);
+                case "migrate" -> migrate(root,out,args);
                 default -> { usage(err); yield 2; }
             };
         } catch(Exception e) { err.println("ERROR: "+e.getMessage()); return 2; }
@@ -124,6 +127,48 @@ public final class Main {
     }
 
 
+
+    private static int version(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if(args.length!=2) throw new IllegalArgumentException("version accepts only <dataset-directory>");
+        DatasetMetadata m=DatasetMetadata.load(root);
+        out.println("schema_version="+m.schemaVersion());
+        out.println("dataset_version="+m.datasetVersion());
+        return 0;
+    }
+
+    private static int migrate(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if(args.length<3) throw new IllegalArgumentException("migrate requires an operation");
+        switch(args[2]) {
+            case "rename-table" -> {
+                if(args.length!=5) throw new IllegalArgumentException("migrate rename-table <dir> <old> <new>");
+                SchemaMigration.renameTable(root,args[3],args[4]);
+            }
+            case "rename-column" -> {
+                if(args.length!=6) throw new IllegalArgumentException("migrate rename-column <dir> <table> <old> <new>");
+                SchemaMigration.renameColumn(root,args[3],args[4],args[5]);
+            }
+            case "add-column" -> {
+                if(args.length<5) throw new IllegalArgumentException("migrate add-column <dir> <table> <column> [--required] [--default value]");
+                boolean required=false; String def="";
+                for(int i=5;i<args.length;i++) {
+                    if(args[i].equals("--required")) required=true;
+                    else if(args[i].equals("--default")) { if(++i>=args.length) throw new IllegalArgumentException("--default requires a value"); def=args[i]; }
+                    else throw new IllegalArgumentException("Unknown add-column option: "+args[i]);
+                }
+                SchemaMigration.addColumn(root,args[3],args[4],required,def);
+            }
+            case "add-unique" -> {
+                if(args.length<6) throw new IllegalArgumentException("migrate add-unique <dir> <table> <key-name> <column[,column...]> ");
+                SchemaMigration.addUnique(root,args[3],args[4],commaList(args[5]));
+            }
+            default -> throw new IllegalArgumentException("Unknown migration operation: "+args[2]);
+        }
+        DatasetMetadata m=DatasetMetadata.load(root);
+        out.println("MIGRATION OK operation="+args[2]);
+        out.println("schema_version="+m.schemaVersion()+" dataset_version="+m.datasetVersion());
+        return 0;
+    }
+
     private static int interactiveEdit(Path root, java.io.PrintStream out, java.io.PrintStream err, String[] args) throws Exception {
         if (args.length != 2) throw new IllegalArgumentException("edit-ui accepts only <dataset-directory>");
         return new TerminalEditor(root, new InputStreamReader(System.in), new OutputStreamWriter(out), new OutputStreamWriter(err)).run();
@@ -176,5 +221,10 @@ public final class Main {
         err.println("  schemacsv references <dataset-directory> <table> column=value...");
         err.println("  schemacsv referenced-by <dataset-directory> <table> column=value...");
         err.println("  schemacsv edit-ui <dataset-directory>");
+        err.println("  schemacsv version <dataset-directory>");
+        err.println("  schemacsv migrate <dataset-directory> rename-table <old> <new>");
+        err.println("  schemacsv migrate <dataset-directory> rename-column <table> <old> <new>");
+        err.println("  schemacsv migrate <dataset-directory> add-column <table> <column> [--required] [--default value]");
+        err.println("  schemacsv migrate <dataset-directory> add-unique <table> <key-name> <column[,column...]>");
     }
 }

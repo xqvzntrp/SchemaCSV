@@ -8,5 +8,5 @@ find "$ROOT/src/main/java" -name '*.java' -print0 | xargs -0 javac --release 21 
 javac --release 21 -cp "$ROOT/out/main" -d "$ROOT/out/test" \
   "$ROOT/src/test/java/io/schemacsv/TestCases.java" \
   "$ROOT/src/test/java/io/schemacsv/TestRunner.java"
-jar --create --file "$ROOT/out/schemacsv-0.7.0.jar" --main-class io.schemacsv.cli.Main -C "$ROOT/out/main" .
-echo "Built out/schemacsv-0.7.0.jar"
+jar --create --file "$ROOT/out/schemacsv-0.8.0.jar" --main-class io.schemacsv.cli.Main -C "$ROOT/out/main" .
+echo "Built out/schemacsv-0.8.0.jar"
