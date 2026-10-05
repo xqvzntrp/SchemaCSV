@@ -3,11 +3,12 @@ package io.schemacsv.cli;
 import io.schemacsv.edit.*;
 import io.schemacsv.model.*;
 import io.schemacsv.validation.*;
+import io.schemacsv.query.*;
 import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-    private static final String VERSION="0.5.0";
+    private static final String VERSION="0.6.0";
     public static void main(String[] args) { int code=run(args,System.out,System.err); if(code!=0) System.exit(code); }
 
     static int run(String[] args, java.io.PrintStream out, java.io.PrintStream err) {
@@ -19,6 +20,11 @@ public final class Main {
                 case "insert" -> insert(root,out,args);
                 case "update" -> update(root,out,args);
                 case "delete" -> delete(root,out,args);
+                case "tables" -> tables(root,out,args);
+                case "select" -> select(root,out,args);
+                case "lookup" -> lookup(root,out,args);
+                case "references" -> references(root,out,args);
+                case "referenced-by" -> referencedBy(root,out,args);
                 default -> { usage(err); yield 2; }
             };
         } catch(Exception e) { err.println("ERROR: "+e.getMessage()); return 2; }
@@ -56,6 +62,94 @@ public final class Main {
         out.println("DELETE OK table="+args[2]+" rule="+(cascade?"CASCADE":"RESTRICT")); return 0;
     }
 
+
+    private static int tables(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if (args.length != 2) throw new IllegalArgumentException("tables accepts only <dataset-directory>");
+        QueryEngine q = new QueryEngine(DataSetLoader.load(root));
+        out.println("table\tfile\trows\tprimary_key");
+        for (TableInfo t : q.tables()) out.printf("%s\t%s\t%d\t%s%n", t.name(), t.file(), t.rows(), String.join(",", t.primaryKeyColumns()));
+        return 0;
+    }
+
+    private static int select(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if (args.length < 3) throw new IllegalArgumentException("select requires <dataset-directory> <table>");
+        LinkedHashMap<String,String> where = new LinkedHashMap<>();
+        List<String> columns = List.of(), sort = List.of();
+        int i = 3;
+        while (i < args.length) {
+            switch (args[i]) {
+                case "--where" -> {
+                    int end = nextOption(args, i + 1);
+                    where.putAll(pairs(args, i + 1, end));
+                    i = end;
+                }
+                case "--columns" -> {
+                    if (++i >= args.length) throw new IllegalArgumentException("--columns requires comma-separated names");
+                    columns = commaList(args[i++]);
+                }
+                case "--sort" -> {
+                    if (++i >= args.length) throw new IllegalArgumentException("--sort requires comma-separated names");
+                    sort = commaList(args[i++]);
+                }
+                default -> throw new IllegalArgumentException("Unknown select option: " + args[i]);
+            }
+        }
+        List<QueryRow> rows = new QueryEngine(DataSetLoader.load(root)).select(args[2], where, columns, sort);
+        printRows(out, rows, columns);
+        return 0;
+    }
+
+    private static int lookup(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if (args.length < 4) throw new IllegalArgumentException("lookup requires <dataset-directory> <table> column=value...");
+        QueryRow row = new QueryEngine(DataSetLoader.load(root)).lookup(args[2], pairs(args,3,args.length));
+        printRows(out, List.of(row), List.of());
+        return 0;
+    }
+
+    private static int references(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if (args.length < 4) throw new IllegalArgumentException("references requires <dataset-directory> <table> column=value...");
+        var rows = new QueryEngine(DataSetLoader.load(root)).references(args[2], pairs(args,3,args.length));
+        printRelationships(out, rows);
+        return 0;
+    }
+
+    private static int referencedBy(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if (args.length < 4) throw new IllegalArgumentException("referenced-by requires <dataset-directory> <table> column=value...");
+        var rows = new QueryEngine(DataSetLoader.load(root)).referencedBy(args[2], pairs(args,3,args.length));
+        printRelationships(out, rows);
+        return 0;
+    }
+
+    private static void printRows(java.io.PrintStream out, List<QueryRow> rows, List<String> requestedColumns) {
+        if (rows.isEmpty()) { out.println("rows=0"); return; }
+        List<String> columns = requestedColumns == null || requestedColumns.isEmpty() ? new ArrayList<>(rows.getFirst().values().keySet()) : requestedColumns;
+        out.println(String.join("\t", columns));
+        for (QueryRow row : rows) {
+            List<String> values = new ArrayList<>();
+            for (String column : columns) values.add(row.values().getOrDefault(column, ""));
+            out.println(String.join("\t", values));
+        }
+        out.println("rows=" + rows.size());
+    }
+
+    private static void printRelationships(java.io.PrintStream out, List<RelationshipRow> rows) {
+        if (rows.isEmpty()) { out.println("relationships=0"); return; }
+        for (RelationshipRow rel : rows) {
+            out.printf("[%s] %s line=%d%n", rel.relationship(), rel.row().table(), rel.row().lineNumber());
+            for (var e : rel.row().values().entrySet()) out.printf("  %s=%s%n", e.getKey(), e.getValue());
+        }
+        out.println("relationships=" + rows.size());
+    }
+
+    private static List<String> commaList(String value) {
+        if (value.isBlank()) return List.of();
+        return Arrays.stream(value.split(",", -1)).map(String::trim).filter(s -> !s.isEmpty()).toList();
+    }
+
+    private static int nextOption(String[] args, int from) {
+        int i=from; while (i<args.length && !args[i].startsWith("--")) i++; return i;
+    }
+
     private static Map<String,String> pairs(String[] args,int from,int to){
         if(from>=to)throw new IllegalArgumentException("At least one column=value pair is required"); LinkedHashMap<String,String> out=new LinkedHashMap<>();
         for(int i=from;i<to;i++){int p=args[i].indexOf('=');if(p<=0)throw new IllegalArgumentException("Expected column=value, got: "+args[i]);out.put(args[i].substring(0,p),args[i].substring(p+1));} return out;
@@ -67,5 +161,10 @@ public final class Main {
         err.println("  schemacsv insert <dataset-directory> <table> column=value...");
         err.println("  schemacsv update <dataset-directory> <table> --key column=value... --set column=value...");
         err.println("  schemacsv delete <dataset-directory> <table> [--cascade] column=value...");
+        err.println("  schemacsv tables <dataset-directory>");
+        err.println("  schemacsv select <dataset-directory> <table> [--where column=value...] [--columns a,b] [--sort a,b]");
+        err.println("  schemacsv lookup <dataset-directory> <table> column=value...");
+        err.println("  schemacsv references <dataset-directory> <table> column=value...");
+        err.println("  schemacsv referenced-by <dataset-directory> <table> column=value...");
     }
 }
