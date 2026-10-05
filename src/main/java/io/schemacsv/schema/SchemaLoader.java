@@ -15,11 +15,17 @@ public final class SchemaLoader {
         CsvTable fkCsv = CsvReader.read(schemaDir.resolve("foreign_keys.csv"));
         Path uniquePath = schemaDir.resolve("unique_keys.csv");
         CsvTable uniqueCsv = Files.exists(uniquePath) ? CsvReader.read(uniquePath) : null;
+        Path defaultsPath = schemaDir.resolve("defaults.csv");
+        CsvTable defaultsCsv = Files.exists(defaultsPath) ? CsvReader.read(defaultsPath) : null;
+        Path checksPath = schemaDir.resolve("check_constraints.csv");
+        CsvTable checksCsv = Files.exists(checksPath) ? CsvReader.read(checksPath) : null;
         requireColumns(tablesCsv, "table_name", "file");
         requireColumns(columnsCsv, "table_name", "column_name", "required", "position");
         requireColumns(pkCsv, "table_name", "key_name", "column_name", "position");
         requireColumns(fkCsv, "table_name", "key_name", "column_name", "position", "referenced_table", "referenced_column");
         if (uniqueCsv != null) requireColumns(uniqueCsv, "table_name", "key_name", "column_name", "position");
+        if (defaultsCsv != null) requireColumns(defaultsCsv, "table_name", "column_name", "default_value");
+        if (checksCsv != null) requireColumns(checksCsv, "table_name", "constraint_name", "column_name", "operator", "operand");
 
         record TableDef(String name, String file) {}
         LinkedHashMap<String,TableDef> defs = new LinkedHashMap<>();
@@ -51,6 +57,17 @@ public final class SchemaLoader {
                     .add(new Positioned<>(pos(uniqueCsv,r),req(uniqueCsv,r,"column_name")));
         }
 
+        Map<String,List<DefaultValueSchema>> defaults = new HashMap<>();
+        if (defaultsCsv != null) for (CsvRecord r : defaultsCsv.records()) {
+            String table=req(defaultsCsv,r,"table_name"); ensureTable(defs,table,defaultsCsv,r);
+            defaults.computeIfAbsent(table,k->new ArrayList<>()).add(new DefaultValueSchema(req(defaultsCsv,r,"column_name"), defaultsCsv.get(r,"default_value")));
+        }
+        Map<String,List<CheckConstraintSchema>> checks = new HashMap<>();
+        if (checksCsv != null) for (CsvRecord r : checksCsv.records()) {
+            String table=req(checksCsv,r,"table_name"); ensureTable(defs,table,checksCsv,r);
+            checks.computeIfAbsent(table,k->new ArrayList<>()).add(new CheckConstraintSchema(req(checksCsv,r,"constraint_name"), req(checksCsv,r,"column_name"), req(checksCsv,r,"operator").toUpperCase(Locale.ROOT), checksCsv.get(r,"operand")));
+        }
+
         record FkPart(int position,String column,String refTable,String refColumn) {}
         Map<String,Map<String,List<FkPart>>> fks = new HashMap<>();
         for (CsvRecord r:fkCsv.records()) {
@@ -76,15 +93,29 @@ public final class SchemaLoader {
                 if(parts.stream().anyMatch(p->!p.refTable().equals(ref))) throw new IllegalArgumentException("Foreign key "+e.getKey()+" references multiple tables");
                 fkList.add(new ForeignKeySchema(e.getKey(), parts.stream().map(FkPart::column).toList(), ref, parts.stream().map(FkPart::refColumn).toList()));
             }
-            validateColumns(d.name(),names,pk,uniqueList,fkList,defs.keySet());
-            schemas.add(new TableSchema(d.name(),d.file(),columnList,pk,uniqueList,fkList));
+            List<DefaultValueSchema> defaultList=defaults.getOrDefault(d.name(),List.of());
+            List<CheckConstraintSchema> checkList=checks.getOrDefault(d.name(),List.of());
+            validateColumns(d.name(),names,pk,uniqueList,fkList,defaultList,checkList,defs.keySet());
+            schemas.add(new TableSchema(d.name(),d.file(),columnList,pk,uniqueList,fkList,defaultList,checkList));
         }
         return new Schema(schemas);
     }
 
-    private static void validateColumns(String table,Set<String> names,PrimaryKeySchema pk,List<UniqueKeySchema> uniques,List<ForeignKeySchema> fks,Set<String> tableNames) {
+    private static void validateColumns(String table,Set<String> names,PrimaryKeySchema pk,List<UniqueKeySchema> uniques,List<ForeignKeySchema> fks,List<DefaultValueSchema> defaults,List<CheckConstraintSchema> checks,Set<String> tableNames) {
         if(pk!=null) for(String c:pk.columns()) if(!names.contains(c)) throw new IllegalArgumentException("Primary key references unknown column "+table+"."+c);
         for(UniqueKeySchema uk:uniques) for(String c:uk.columns()) if(!names.contains(c)) throw new IllegalArgumentException("Unique key references unknown column "+table+"."+c);
+        Set<String> defaultColumns=new HashSet<>();
+        for(DefaultValueSchema d:defaults) {
+            if(!names.contains(d.column())) throw new IllegalArgumentException("Default references unknown column "+table+"."+d.column());
+            if(!defaultColumns.add(d.column())) throw new IllegalArgumentException("Duplicate default for "+table+"."+d.column());
+        }
+        Set<String> checkNames=new HashSet<>();
+        Set<String> supported=Set.of("IN","MATCHES","MIN_LENGTH","MAX_LENGTH","NUMERIC_MIN","NUMERIC_MAX");
+        for(CheckConstraintSchema c:checks) {
+            if(!names.contains(c.column())) throw new IllegalArgumentException("Check constraint references unknown column "+table+"."+c.column());
+            if(!checkNames.add(c.name())) throw new IllegalArgumentException("Duplicate check constraint "+table+"."+c.name());
+            if(!supported.contains(c.operator())) throw new IllegalArgumentException("Unsupported check operator '"+c.operator()+"' for "+table+"."+c.name());
+        }
         for(ForeignKeySchema fk:fks) {
             for(String c:fk.columns()) if(!names.contains(c)) throw new IllegalArgumentException("Foreign key references unknown local column "+table+"."+c);
             if(!tableNames.contains(fk.referencedTable())) throw new IllegalArgumentException("Foreign key "+fk.name()+" references unknown table "+fk.referencedTable());

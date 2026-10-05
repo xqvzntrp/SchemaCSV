@@ -14,6 +14,7 @@ public final class ConstraintValidator {
         validatePrimaryKeys(ds,out);
         validateUniqueKeys(ds,out);
         validateForeignKeys(ds,out);
+        validateChecks(ds,out);
         return new ValidationResult(out);
     }
 
@@ -66,5 +67,34 @@ public final class ConstraintValidator {
             }
         }
     }
+    private static void validateChecks(DataSet ds,List<ConstraintViolation> out) {
+        for(DataTable dt:ds.tables()) for(CheckConstraintSchema check:dt.schema().checks()) {
+            if(!dt.csv().hasColumn(check.column())) continue;
+            for(CsvRecord r:dt.csv().records()) {
+                String value=dt.csv().get(r,check.column());
+                if(value.isBlank()) continue;
+                boolean ok;
+                try { ok=check(value,check.operator(),check.operand()); }
+                catch(RuntimeException e) {
+                    out.add(new ConstraintViolation("CHECK_CONFIG_INVALID","Check constraint '"+check.name()+"' is invalid: "+e.getMessage(),dt.csv().path(),r.lineNumber()));
+                    continue;
+                }
+                if(!ok) out.add(new ConstraintViolation("CHECK_VIOLATION","Check constraint '"+check.name()+"' failed for "+dt.schema().name()+"."+check.column()+"='"+value+"' ("+check.operator()+" "+check.operand()+")",dt.csv().path(),r.lineNumber()));
+            }
+        }
+    }
+
+    private static boolean check(String value,String operator,String operand) {
+        return switch(operator) {
+            case "IN" -> Arrays.stream(operand.split("\\|",-1)).anyMatch(value::equals);
+            case "MATCHES" -> value.matches(operand);
+            case "MIN_LENGTH" -> value.length() >= Integer.parseInt(operand);
+            case "MAX_LENGTH" -> value.length() <= Integer.parseInt(operand);
+            case "NUMERIC_MIN" -> new java.math.BigDecimal(value).compareTo(new java.math.BigDecimal(operand)) >= 0;
+            case "NUMERIC_MAX" -> new java.math.BigDecimal(value).compareTo(new java.math.BigDecimal(operand)) <= 0;
+            default -> throw new IllegalArgumentException("unsupported operator "+operator);
+        };
+    }
+
     private static Key key(CsvTable t,CsvRecord r,List<String> columns){return new Key(columns.stream().map(c->t.get(r,c).trim()).toList());}
 }

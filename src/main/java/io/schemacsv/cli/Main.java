@@ -11,7 +11,7 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-    private static final String VERSION="0.8.0";
+    private static final String VERSION="0.9.0";
     public static void main(String[] args) { int code=run(args,System.out,System.err); if(code!=0) System.exit(code); }
 
     static int run(String[] args, java.io.PrintStream out, java.io.PrintStream err) {
@@ -30,6 +30,7 @@ public final class Main {
                 case "referenced-by" -> referencedBy(root,out,args);
                 case "edit-ui" -> interactiveEdit(root,out,err,args);
                 case "version" -> version(root,out,args);
+                case "history" -> history(root,out,args);
                 case "migrate" -> migrate(root,out,args);
                 default -> { usage(err); yield 2; }
             };
@@ -136,6 +137,21 @@ public final class Main {
         return 0;
     }
 
+    private static int history(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if(args.length!=2) throw new IllegalArgumentException("history accepts only <dataset-directory>");
+        Path path=root.resolve("schema/migrations.csv");
+        if(!Files.exists(path)) { out.println("migrations=0"); return 0; }
+        var csv=io.schemacsv.csv.CsvReader.read(path);
+        out.println(String.join("\t",csv.header()));
+        for(var r:csv.records()) {
+            List<String> values=new ArrayList<>();
+            for(String c:csv.header()) values.add(csv.get(r,c));
+            out.println(String.join("\t",values));
+        }
+        out.println("migrations="+csv.records().size());
+        return 0;
+    }
+
     private static int migrate(Path root, java.io.PrintStream out, String[] args) throws Exception {
         if(args.length<3) throw new IllegalArgumentException("migrate requires an operation");
         switch(args[2]) {
@@ -160,6 +176,14 @@ public final class Main {
             case "add-unique" -> {
                 if(args.length<6) throw new IllegalArgumentException("migrate add-unique <dir> <table> <key-name> <column[,column...]> ");
                 SchemaMigration.addUnique(root,args[3],args[4],commaList(args[5]));
+            }
+            case "set-default" -> {
+                if(args.length!=6) throw new IllegalArgumentException("migrate set-default <dir> <table> <column> <value>");
+                SchemaMigration.setDefault(root,args[3],args[4],args[5]);
+            }
+            case "add-check" -> {
+                if(args.length!=8) throw new IllegalArgumentException("migrate add-check <dir> <table> <name> <column> <operator> <operand>");
+                SchemaMigration.addCheck(root,args[3],args[4],args[5],args[6],args[7]);
             }
             default -> throw new IllegalArgumentException("Unknown migration operation: "+args[2]);
         }
@@ -222,9 +246,12 @@ public final class Main {
         err.println("  schemacsv referenced-by <dataset-directory> <table> column=value...");
         err.println("  schemacsv edit-ui <dataset-directory>");
         err.println("  schemacsv version <dataset-directory>");
+        err.println("  schemacsv history <dataset-directory>");
         err.println("  schemacsv migrate <dataset-directory> rename-table <old> <new>");
         err.println("  schemacsv migrate <dataset-directory> rename-column <table> <old> <new>");
         err.println("  schemacsv migrate <dataset-directory> add-column <table> <column> [--required] [--default value]");
         err.println("  schemacsv migrate <dataset-directory> add-unique <table> <key-name> <column[,column...]>");
+        err.println("  schemacsv migrate <dataset-directory> set-default <table> <column> <value>");
+        err.println("  schemacsv migrate <dataset-directory> add-check <table> <name> <column> <operator> <operand>");
     }
 }

@@ -14,7 +14,7 @@ public final class Transaction implements AutoCloseable {
 
     public Transaction insert(String table, Map<String,String> values){
         ensureOpen(); TableSchema ts=owner.schema().requireTable(table); LinkedHashMap<String,String> row=new LinkedHashMap<>();
-        for(ColumnSchema c:ts.columns()) row.put(c.name(),values.getOrDefault(c.name(),""));
+        for(ColumnSchema c:ts.columns()) row.put(c.name(), values.containsKey(c.name()) ? values.get(c.name()) : ts.defaultValue(c.name()).orElse(""));
         for(String k:values.keySet()) if(!ts.columnNames().contains(k)) throw new EditException("Unknown column "+table+"."+k);
         rows.get(table).add(row); return this;
     }
