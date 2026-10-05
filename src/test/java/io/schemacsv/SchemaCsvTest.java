@@ -32,4 +32,9 @@ final class SchemaCsvTest {
     @Test void renameTableMigratesRelationshipReferences() throws Exception { TestCases.renameTableMigratesRelationshipReferences(repo); }
     @Test void addColumnAppliesDefaultAndAdvancesMetadata() throws Exception { TestCases.addColumnAppliesDefaultAndAdvancesMetadata(repo); }
     @Test void addUniqueConstraintIsValidated() throws Exception { TestCases.addUniqueConstraintIsValidated(repo); }
+    @Test void persistentDefaultAppliesToFutureInsert() throws Exception { TestCases.persistentDefaultAppliesToFutureInsert(repo); }
+    @Test void setDefaultSupportsRequiredColumns() throws Exception { TestCases.setDefaultSupportsRequiredColumns(repo); }
+    @Test void checkConstraintRejectsInvalidEdit() throws Exception { TestCases.checkConstraintRejectsInvalidEdit(repo); }
+    @Test void migrationHistoryRecordsOperations() throws Exception { TestCases.migrationHistoryRecordsOperations(repo); }
+    @Test void renameColumnPropagatesDefaultAndCheckMetadata() throws Exception { TestCases.renameColumnPropagatesDefaultAndCheckMetadata(repo); }
 }

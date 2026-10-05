@@ -32,6 +32,11 @@ public final class TestRunner {
         test("rename table migrates relationship references", () -> TestCases.renameTableMigratesRelationshipReferences(repo));
         test("add column applies default and advances metadata", () -> TestCases.addColumnAppliesDefaultAndAdvancesMetadata(repo));
         test("add unique constraint is validated", () -> TestCases.addUniqueConstraintIsValidated(repo));
+        test("persistent default applies to future insert", () -> TestCases.persistentDefaultAppliesToFutureInsert(repo));
+        test("set default supports required columns", () -> TestCases.setDefaultSupportsRequiredColumns(repo));
+        test("check constraint rejects invalid edit", () -> TestCases.checkConstraintRejectsInvalidEdit(repo));
+        test("migration history records operations", () -> TestCases.migrationHistoryRecordsOperations(repo));
+        test("rename column propagates default and check metadata", () -> TestCases.renameColumnPropagatesDefaultAndCheckMetadata(repo));
         System.out.printf("TESTS: %d passed, 0 failed, %d total%n", passed, passed);
     }
 

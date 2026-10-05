@@ -273,6 +273,72 @@ public final class TestCases {
     }
 
 
+    public static void persistentDefaultAppliesToFutureInsert(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.addColumn(root, "category", "status", true, "ACTIVE");
+            EditableDataSet db=EditableDataSet.load(root);
+            try(Transaction tx=db.beginTransaction()) {
+                tx.insertValidated("category", Map.of("category_key","101","channel_key","1","category_code","SOFAS","name","Sofas"));
+                tx.commitAndSave();
+            }
+            var row=new QueryEngine(DataSetLoader.load(root)).lookup("category", Map.of("category_key","101"));
+            check(row.values().get("status").equals("ACTIVE"), "persistent default should apply to later inserts");
+        });
+    }
+
+    public static void setDefaultSupportsRequiredColumns(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.setDefault(root,"category","name","Unnamed");
+            EditableDataSet db=EditableDataSet.load(root);
+            try(Transaction tx=db.beginTransaction()) {
+                tx.insertValidated("category", Map.of("category_key","101","channel_key","1","category_code","SOFAS"));
+                tx.commitAndSave();
+            }
+            var row=new QueryEngine(DataSetLoader.load(root)).lookup("category", Map.of("category_key","101"));
+            check(row.values().get("name").equals("Unnamed"), "set-default should supply omitted required value");
+        });
+    }
+
+    public static void checkConstraintRejectsInvalidEdit(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.addCheck(root,"category","ck_category_code","category_code","MATCHES","[A-Z0-9_]+");
+            EditableDataSet db=EditableDataSet.load(root);
+            try(Transaction tx=db.beginTransaction()) {
+                boolean failed=false;
+                try { tx.updateValidated("category",Map.of("category_key","100"),Map.of("category_code","bad-code")); }
+                catch(EditException e) { failed=e.getMessage().contains("CHECK_VIOLATION"); }
+                check(failed,"check constraint should reject invalid edit");
+            }
+        });
+    }
+
+    public static void migrationHistoryRecordsOperations(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.setDefault(root,"category","name","Unnamed");
+            SchemaMigration.addCheck(root,"category","ck_name_len","name","MIN_LENGTH","2");
+            var csv=io.schemacsv.csv.CsvReader.read(root.resolve("schema/migrations.csv"));
+            check(csv.records().size()==2,"two migrations should be recorded");
+            check(csv.get(csv.records().get(0),"operation").equals("set-default"),"first audit operation should be set-default");
+            check(csv.get(csv.records().get(1),"operation").equals("add-check"),"second audit operation should be add-check");
+            var meta=DatasetMetadata.load(root);
+            check(meta.schemaVersion()==3 && meta.datasetVersion()==3,"audit migrations should advance versions");
+        });
+    }
+
+    public static void renameColumnPropagatesDefaultAndCheckMetadata(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.setDefault(root,"category","name","Unnamed");
+            SchemaMigration.addCheck(root,"category","ck_name_len","name","MIN_LENGTH","2");
+            SchemaMigration.renameColumn(root,"category","name","display_name");
+            var ds=DataSetLoader.load(root);
+            var table=ds.schema().requireTable("category");
+            check(table.defaultValue("display_name").orElseThrow().equals("Unnamed"),"default should follow renamed column");
+            check(table.checks().stream().anyMatch(c->c.name().equals("ck_name_len")&&c.column().equals("display_name")),"check should follow renamed column");
+            check(ConstraintValidator.validate(ds).valid(),"renamed default/check schema should remain valid");
+        });
+    }
+
+
     private static void withCopy(Path source, ThrowingPath body) throws Exception {
         Path tmp = Files.createTempDirectory("schemacsv-test-");
         copyTree(source, tmp);
