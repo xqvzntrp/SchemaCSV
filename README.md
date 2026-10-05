@@ -6,7 +6,7 @@
 
 ## Status
 
-SchemaCSV v0.9.0 implements **Phase 7 — Defaults, Check Constraints, and Migration Audit**. It adds persistent insert defaults, declarative check constraints, and append-only migration history on top of the schema-evolution engine.
+SchemaCSV v0.10.0 implements **Phase 8 — Indexing and Performance**. It adds schema-derived in-memory indexes for primary keys, unique keys, and foreign-key relationships, plus query-plan inspection, while keeping CSV files as the only durable source of truth.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables and schema definitions
@@ -28,6 +28,9 @@ SchemaCSV v0.9.0 implements **Phase 7 — Defaults, Check Constraints, and Migra
 - Persistent defaults for future inserts
 - Declarative check constraints
 - Append-only migration audit history
+- Schema-derived in-memory indexes for PK/UNIQUE/FK access paths
+- Indexed exact-match queries and relationship traversal
+- Query-plan and index inspection commands
 
 ## Quick start
 
@@ -41,7 +44,7 @@ Requires Java 21 or newer.
 Expected output:
 
 ```text
-SchemaCSV 0.9.0
+SchemaCSV 0.10.0
 tables=4 rows=5
 validation=OK
 ```
@@ -352,6 +355,34 @@ Every successful schema migration is appended to `schema/migrations.csv` with it
 
 The audit log is append-only from SchemaCSV's migration API. A failed staged migration is discarded and does not create a history entry.
 
+## Indexing and query plans
+
+SchemaCSV builds transient hash indexes from the schema whenever a dataset is loaded. Primary keys, unique keys, and foreign-key relationship columns become indexed access paths automatically; no separate index-definition file is required.
+
+Inspect the runtime index catalog:
+
+```bash
+./scripts/schemacsv indexes examples/basic
+```
+
+Explain whether an exact-match query will use an index or scan the table:
+
+```bash
+./scripts/schemacsv explain examples/basic field field_key=1000
+./scripts/schemacsv explain examples/basic field category_key=100
+./scripts/schemacsv explain examples/basic field name=Brand
+```
+
+Typical output:
+
+```text
+INDEX table=field name=pk_field columns=field_key
+INDEX table=field name=fk_field_category_child columns=category_key
+SCAN table=field
+```
+
+Indexes are deliberately **not persisted**. CSV data and schema remain the complete source of truth, and indexes can always be reconstructed on load.
+
 ## Roadmap
 
 The roadmap describes the intended direction of the project and may change as the design evolves.
@@ -424,13 +455,23 @@ The roadmap describes the intended direction of the project and may change as th
 - `history` CLI command
 - Rename propagation for default/check metadata
 
+### Phase 8 — Indexing and Performance ✅
+
+- Schema-derived in-memory hash indexes
+- PK, UNIQUE, and FK access paths
+- Indexed exact-match queries and relationship traversal
+- Indexed PK/UNIQUE/FK validation
+- `indexes` runtime catalog command
+- `explain` query-plan command
+- Scan fallback for unindexed predicates
+
 ### Future possibilities
 
 - Desktop or web UI
 - Import/export adapters
 - Stable Java library API
 - Pluggable storage formats
-- Indexes for larger datasets
+- Persistent or alternate index implementations for very large datasets
 
 ## Building
 
@@ -440,14 +481,14 @@ Requires Java 21 or newer. The POM pins a modern Maven compiler plugin and compi
 
 ```bash
 mvn clean package
-java -jar target/schemacsv-0.9.0.jar validate examples/basic
+java -jar target/schemacsv-0.10.0.jar validate examples/basic
 ```
 
 ### Without Maven
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.9.0.jar validate examples/basic
+java -jar out/schemacsv-0.10.0.jar validate examples/basic
 ```
 
 ## License
