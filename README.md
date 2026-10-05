@@ -2,11 +2,11 @@
 
 **SchemaCSV** is a lightweight relational data engine for CSV files. It adds explicit schema, primary-key, foreign-key, composite-key, and required-value validation while keeping plain CSV files as the durable source of truth.
 
-> Phase 1 goal: prove that CSV files can behave like a small relational dataset with enforceable schema, primary-key, and foreign-key rules.
+> SchemaCSV keeps CSV files as the durable source of truth while adding relational integrity and safe, transactional editing.
 
 ## Status
 
-SchemaCSV v0.1.0 implements **Phase 1 — Relational Validation**.
+SchemaCSV v0.2.0 implements **Phase 2 — Safe Editing and Persistence** on top of the Phase 1 relational validator.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables
@@ -18,6 +18,11 @@ SchemaCSV v0.1.0 implements **Phase 1 — Relational Validation**.
 - `validate` CLI command
 - Valid and intentionally invalid example datasets
 - Dependency-free test runner
+- Transaction-style insert, update, and delete operations
+- Recursive foreign-key propagation when referenced keys change
+- `RESTRICT` and `CASCADE` delete rules
+- Atomic replacement of the `data/` directory
+- Reload-after-save validation
 
 ## Quick start
 
@@ -31,7 +36,7 @@ Requires Java 21 or newer.
 Expected validation output:
 
 ```text
-SchemaCSV 0.1.0
+SchemaCSV 0.2.0
 tables=4 rows=5
 validation=OK
 ```
@@ -96,8 +101,39 @@ field,fk_field_category,category_code,2,category,code
 
 ## CLI
 
+Validate:
+
 ```bash
 ./scripts/schemacsv validate <dataset-directory>
+```
+
+Insert a row:
+
+```bash
+./scripts/schemacsv insert examples/basic category \
+  channel_code=WAYFAIR code=SOFAS_101 name=Sofas
+```
+
+Update a row. Changes to referenced key columns propagate through dependent foreign keys:
+
+```bash
+./scripts/schemacsv update examples/basic category \
+  --key channel_code=WAYFAIR code=SECTIONALS_306 \
+  --set code=SECTIONALS_307
+```
+
+Delete is restrictive by default:
+
+```bash
+./scripts/schemacsv delete examples/basic category \
+  channel_code=WAYFAIR code=SECTIONALS_306
+```
+
+Explicit cascading delete:
+
+```bash
+./scripts/schemacsv delete examples/basic category --cascade \
+  channel_code=WAYFAIR code=SECTIONALS_306
 ```
 
 Exit codes:
@@ -128,15 +164,16 @@ The roadmap describes the intended direction of the project and may change as th
 - Validation CLI
 - File and row diagnostics
 
-### Phase 2 — Safe Editing and Persistence
+### Phase 2 — Safe Editing and Persistence ✅
 
 - Insert, update, and delete operations
 - Primary-key changes
-- Foreign-key propagation
-- Restrict and cascade rules
+- Recursive foreign-key propagation
+- Restrict and cascade delete rules
 - Transaction-style editing
-- Atomic CSV writes
+- Atomic data-directory replacement
 - Reload-after-save validation
+- Editing CLI commands
 
 ### Phase 3 — Query and Navigation
 
@@ -177,7 +214,7 @@ The roadmap describes the intended direction of the project and may change as th
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.1.0.jar validate examples/basic
+java -jar out/schemacsv-0.2.0.jar validate examples/basic
 ```
 
 A `pom.xml` is included for Maven-based environments as well.
