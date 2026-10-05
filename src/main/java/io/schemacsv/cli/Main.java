@@ -11,7 +11,7 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class Main {
-    private static final String VERSION="0.9.0";
+    private static final String VERSION="0.10.0";
     public static void main(String[] args) { int code=run(args,System.out,System.err); if(code!=0) System.exit(code); }
 
     static int run(String[] args, java.io.PrintStream out, java.io.PrintStream err) {
@@ -24,6 +24,8 @@ public final class Main {
                 case "update" -> update(root,out,args);
                 case "delete" -> delete(root,out,args);
                 case "tables" -> tables(root,out,args);
+                case "indexes" -> indexes(root,out,args);
+                case "explain" -> explain(root,out,args);
                 case "select" -> select(root,out,args);
                 case "lookup" -> lookup(root,out,args);
                 case "references" -> references(root,out,args);
@@ -75,6 +77,23 @@ public final class Main {
         QueryEngine q = new QueryEngine(DataSetLoader.load(root));
         out.println("table\tfile\trows\tprimary_key");
         for (TableInfo t : q.tables()) out.printf("%s\t%s\t%d\t%s%n", t.name(), t.file(), t.rows(), String.join(",", t.primaryKeyColumns()));
+        return 0;
+    }
+
+
+    private static int indexes(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if(args.length!=2) throw new IllegalArgumentException("indexes accepts only <dataset-directory>");
+        QueryEngine q=new QueryEngine(DataSetLoader.load(root));
+        out.println("table\tindex\tkind\tcolumns\tdistinct_keys\trows");
+        for(var s:q.indexStats()) out.printf("%s\t%s\t%s\t%s\t%d\t%d%n",s.table(),s.name(),s.kind(),String.join(",",s.columns()),s.distinctKeys(),s.indexedRows());
+        out.println("indexes="+q.indexStats().size());
+        return 0;
+    }
+
+    private static int explain(Path root, java.io.PrintStream out, String[] args) throws Exception {
+        if(args.length<3) throw new IllegalArgumentException("explain requires <dataset-directory> <table> [column=value...]");
+        Map<String,String> where=pairs(args,3,args.length);
+        out.println(new QueryEngine(DataSetLoader.load(root)).explainSelect(args[2],where));
         return 0;
     }
 
@@ -240,6 +259,8 @@ public final class Main {
         err.println("  schemacsv update <dataset-directory> <table> --key column=value... --set column=value...");
         err.println("  schemacsv delete <dataset-directory> <table> [--cascade] column=value...");
         err.println("  schemacsv tables <dataset-directory>");
+        err.println("  schemacsv indexes <dataset-directory>");
+        err.println("  schemacsv explain <dataset-directory> <table> [column=value...]");
         err.println("  schemacsv select <dataset-directory> <table> [--where column=value...] [--columns a,b] [--sort a,b]");
         err.println("  schemacsv lookup <dataset-directory> <table> column=value...");
         err.println("  schemacsv references <dataset-directory> <table> column=value...");
