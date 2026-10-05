@@ -19,43 +19,62 @@ public final class TestRunner {
             check(!r.valid(),"expected invalid dataset");
             check(r.violations().stream().anyMatch(v->v.code().equals("FOREIGN_KEY_MISSING_PARENT")),"expected FK violation");
         });
-        test("composite primary key is unique",()->{
+        test("primary keys use stable key columns",()->{
             var ds=DataSetLoader.load(repo.resolve("examples/basic"));
-            check(ds.schema().requireTable("category").primaryKey().columns().size()==2,"expected composite PK");
+            check(ds.schema().requireTable("category").primaryKey().columns().equals(List.of("category_key")),"category PK should be category_key");
+            check(ds.schema().requireTable("field").primaryKey().columns().equals(List.of("field_key")),"field PK should be field_key");
         });
-        test("composite foreign key is defined",()->{
+        test("business codes have scoped unique constraints",()->{
             var ds=DataSetLoader.load(repo.resolve("examples/basic"));
-            var fk=ds.schema().requireTable("field").foreignKeys().getFirst();
-            check(fk.columns().size()==2 && fk.referencedColumns().size()==2,"expected composite FK");
+            var uk=ds.schema().requireTable("category").uniqueKeys().getFirst();
+            check(uk.columns().equals(List.of("channel_key","category_code")),"expected scoped category code uniqueness");
         });
+        test("duplicate business code is rejected",()->withCopy(repo.resolve("examples/basic"), root->{
+            var db=EditableDataSet.load(root);
+            try(var tx=db.beginTransaction()) {
+                tx.insert("category",Map.of("category_key","101","channel_key","1","category_code","SECTIONALS_306","name","Duplicate"));
+                boolean failed=false; try{tx.commit();}catch(EditException e){failed=true;}
+                check(failed,"expected duplicate scoped code to fail");
+            }
+        }));
         test("invalid insert is rejected at commit",()->withCopy(repo.resolve("examples/basic"), root->{
             var db=EditableDataSet.load(root);
             try(var tx=db.beginTransaction()) {
-                tx.insert("field",Map.of("channel_code","WAYFAIR","category_code","MISSING","code","x","name","Bad"));
+                tx.insert("field",Map.of("field_key","2000","category_key","999","field_code","x","name","Bad"));
                 boolean failed=false; try{tx.commit();}catch(EditException e){failed=true;}
                 check(failed,"expected invalid FK insert to fail");
             }
         }));
-        test("primary key rename cascades through relationship chain",()->withCopy(repo.resolve("examples/basic"), root->{
+        test("business code rename does not change relational keys",()->withCopy(repo.resolve("examples/basic"), root->{
             var db=EditableDataSet.load(root);
             try(var tx=db.beginTransaction()) {
-                tx.update("category",Map.of("channel_code","WAYFAIR","code","SECTIONALS_306"),Map.of("code","SECTIONALS_307"));
+                tx.update("category",Map.of("category_key","100"),Map.of("category_code","SECTIONALS_307"));
                 tx.commitAndSave();
             }
-            var ds=DataSetLoader.load(root); var result=ConstraintValidator.validate(ds); check(result.valid(),"renamed dataset should validate");
+            var ds=DataSetLoader.load(root); check(ConstraintValidator.validate(ds).valid(),"renamed dataset should validate");
+            var category=ds.requireTable("category").csv();
+            check(category.get(category.records().getFirst(),"category_key").equals("100"),"category_key must stay stable");
             var field=ds.requireTable("field").csv();
-            check(field.records().stream().allMatch(r->field.get(r,"category_code").equals("SECTIONALS_307")),"field FKs should cascade");
-            var value=ds.requireTable("value").csv();
-            check(value.records().stream().allMatch(r->value.get(r,"category_code").equals("SECTIONALS_307")),"value FKs should cascade recursively");
+            check(field.records().stream().allMatch(r->field.get(r,"category_key").equals("100")),"field FK should remain stable");
+        }));
+        test("true key rename cascades to foreign keys",()->withCopy(repo.resolve("examples/basic"), root->{
+            var db=EditableDataSet.load(root);
+            try(var tx=db.beginTransaction()) {
+                tx.update("category",Map.of("category_key","100"),Map.of("category_key","101"));
+                tx.commitAndSave();
+            }
+            var ds=DataSetLoader.load(root); check(ConstraintValidator.validate(ds).valid(),"key-renamed dataset should validate");
+            var field=ds.requireTable("field").csv();
+            check(field.records().stream().allMatch(r->field.get(r,"category_key").equals("101")),"field FK should cascade");
         }));
         test("restrict blocks parent delete",()->withCopy(repo.resolve("examples/basic"), root->{
             var db=EditableDataSet.load(root); boolean failed=false;
-            try(var tx=db.beginTransaction()) { try{tx.delete("category",Map.of("channel_code","WAYFAIR","code","SECTIONALS_306"),DeleteRule.RESTRICT);}catch(EditException e){failed=true;} }
+            try(var tx=db.beginTransaction()) { try{tx.delete("category",Map.of("category_key","100"),DeleteRule.RESTRICT);}catch(EditException e){failed=true;} }
             check(failed,"expected restricted delete to fail");
         }));
         test("cascade delete removes dependent rows",()->withCopy(repo.resolve("examples/basic"), root->{
             var db=EditableDataSet.load(root);
-            try(var tx=db.beginTransaction()) { tx.delete("category",Map.of("channel_code","WAYFAIR","code","SECTIONALS_306"),DeleteRule.CASCADE); tx.commitAndSave(); }
+            try(var tx=db.beginTransaction()) { tx.delete("category",Map.of("category_key","100"),DeleteRule.CASCADE); tx.commitAndSave(); }
             var ds=DataSetLoader.load(root); check(ConstraintValidator.validate(ds).valid(),"cascade result should validate");
             check(ds.requireTable("category").csv().records().isEmpty(),"category should be deleted");
             check(ds.requireTable("field").csv().records().isEmpty(),"fields should cascade");
