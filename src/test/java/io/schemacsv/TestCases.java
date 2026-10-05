@@ -5,6 +5,7 @@ import io.schemacsv.model.*;
 import io.schemacsv.validation.*;
 import io.schemacsv.query.*;
 import io.schemacsv.tui.TerminalEditor;
+import io.schemacsv.migration.*;
 import java.io.*;
 
 import java.nio.file.*;
@@ -217,6 +218,57 @@ public final class TestCases {
             check(stdout.toString().contains("Living Room Sectionals"), "staged row browsing should show quoted value");
             var row = new QueryEngine(DataSetLoader.load(root)).lookup("category", Map.of("category_key","100"));
             check(row.values().get("name").equals("Living Room Sectionals"), "quoted value should persist");
+        });
+    }
+
+
+    public static void metadataReportsDatasetAndSchemaVersion(Path repo) throws Exception {
+        var m = DatasetMetadata.load(repo.resolve("examples/basic"));
+        check(m.schemaVersion() == 1, "expected schema version 1");
+        check(m.datasetVersion() == 1, "expected dataset version 1");
+    }
+
+    public static void renameColumnMigratesKeysAndForeignKeys(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.renameColumn(root, "field", "field_key", "field_id");
+            var ds = DataSetLoader.load(root);
+            check(ds.schema().requireTable("field").primaryKey().columns().equals(List.of("field_id")), "PK should use renamed column");
+            var valueFk = ds.schema().requireTable("value").foreignKeys().getFirst();
+            check(valueFk.referencedColumns().equals(List.of("field_id")), "referencing FK should follow renamed parent column");
+            check(ds.requireTable("field").csv().hasColumn("field_id"), "data header should be renamed");
+            check(ConstraintValidator.validate(ds).valid(), "renamed schema should remain valid");
+        });
+    }
+
+    public static void renameTableMigratesRelationshipReferences(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.renameTable(root, "field", "attribute");
+            var ds = DataSetLoader.load(root);
+            check(ds.schema().requireTable("attribute") != null, "renamed table should load");
+            var fk = ds.schema().requireTable("value").foreignKeys().getFirst();
+            check(fk.referencedTable().equals("attribute"), "FK should reference renamed table");
+            check(ConstraintValidator.validate(ds).valid(), "renamed table dataset should remain valid");
+        });
+    }
+
+    public static void addColumnAppliesDefaultAndAdvancesMetadata(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.addColumn(root, "category", "status", true, "ACTIVE");
+            var ds = DataSetLoader.load(root);
+            var row = new QueryEngine(ds).lookup("category", Map.of("category_key","100"));
+            check(row.values().get("status").equals("ACTIVE"), "default should populate existing rows");
+            var m=DatasetMetadata.load(root);
+            check(m.schemaVersion()==2 && m.datasetVersion()==2, "migration should advance metadata versions");
+            check(ConstraintValidator.validate(ds).valid(), "dataset should remain valid after add-column");
+        });
+    }
+
+    public static void addUniqueConstraintIsValidated(Path repo) throws Exception {
+        withCopy(repo.resolve("examples/basic"), root -> {
+            SchemaMigration.addUnique(root, "field", "uq_field_name", List.of("category_key","name"));
+            var ds=DataSetLoader.load(root);
+            check(ds.schema().requireTable("field").uniqueKeys().stream().anyMatch(k -> k.name().equals("uq_field_name")), "unique key should be added");
+            check(ConstraintValidator.validate(ds).valid(), "new unique constraint should validate");
         });
     }
 

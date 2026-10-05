@@ -27,6 +27,11 @@ public final class TestRunner {
         test("interactive save persists changes", () -> TestCases.interactiveSavePersistsChanges(repo));
         test("interactive invalid edit is rejected without ending session", () -> TestCases.interactiveInvalidEditIsRejectedWithoutEndingSession(repo));
         test("interactive editor supports quoted values and navigation", () -> TestCases.interactiveEditorSupportsQuotedValuesAndNavigation(repo));
+        test("metadata reports dataset and schema version", () -> TestCases.metadataReportsDatasetAndSchemaVersion(repo));
+        test("rename column migrates keys and foreign keys", () -> TestCases.renameColumnMigratesKeysAndForeignKeys(repo));
+        test("rename table migrates relationship references", () -> TestCases.renameTableMigratesRelationshipReferences(repo));
+        test("add column applies default and advances metadata", () -> TestCases.addColumnAppliesDefaultAndAdvancesMetadata(repo));
+        test("add unique constraint is validated", () -> TestCases.addUniqueConstraintIsValidated(repo));
         System.out.printf("TESTS: %d passed, 0 failed, %d total%n", passed, passed);
     }
 

@@ -27,4 +27,9 @@ final class SchemaCsvTest {
     @Test void interactiveSavePersistsChanges() throws Exception { TestCases.interactiveSavePersistsChanges(repo); }
     @Test void interactiveInvalidEditIsRejectedWithoutEndingSession() throws Exception { TestCases.interactiveInvalidEditIsRejectedWithoutEndingSession(repo); }
     @Test void interactiveEditorSupportsQuotedValuesAndNavigation() throws Exception { TestCases.interactiveEditorSupportsQuotedValuesAndNavigation(repo); }
+    @Test void metadataReportsDatasetAndSchemaVersion() throws Exception { TestCases.metadataReportsDatasetAndSchemaVersion(repo); }
+    @Test void renameColumnMigratesKeysAndForeignKeys() throws Exception { TestCases.renameColumnMigratesKeysAndForeignKeys(repo); }
+    @Test void renameTableMigratesRelationshipReferences() throws Exception { TestCases.renameTableMigratesRelationshipReferences(repo); }
+    @Test void addColumnAppliesDefaultAndAdvancesMetadata() throws Exception { TestCases.addColumnAppliesDefaultAndAdvancesMetadata(repo); }
+    @Test void addUniqueConstraintIsValidated() throws Exception { TestCases.addUniqueConstraintIsValidated(repo); }
 }
