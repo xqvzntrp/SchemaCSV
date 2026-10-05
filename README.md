@@ -6,7 +6,7 @@
 
 ## Status
 
-SchemaCSV v0.3.0 implements **Phase 3 — Relational Identity Refinement** on top of the Phase 1 validator and Phase 2 editing/persistence engine.
+SchemaCSV v0.4.0 implements **Phase 3 — Relational Identity Refinement** on top of the Phase 1 validator and Phase 2 editing/persistence engine.
 
 - Plain Java 21; no runtime dependencies
 - CSV-backed tables and schema definitions
@@ -35,7 +35,7 @@ Requires Java 21 or newer.
 Expected output:
 
 ```text
-SchemaCSV 0.3.0
+SchemaCSV 0.4.0
 tables=4 rows=5
 validation=OK
 ```
@@ -306,14 +306,23 @@ The roadmap describes the intended direction of the project and may change as th
 - Pluggable storage formats
 - Indexes for larger datasets
 
-## Building without Maven
+## Building
+
+### Maven
+
+Requires Java 21 or newer. The POM pins a modern Maven compiler plugin and compiles with `--release 21`.
+
+```bash
+mvn clean package
+java -jar target/schemacsv-0.4.0.jar validate examples/basic
+```
+
+### Without Maven
 
 ```bash
 ./scripts/build.sh
-java -jar out/schemacsv-0.3.0.jar validate examples/basic
+java -jar out/schemacsv-0.4.0.jar validate examples/basic
 ```
-
-A `pom.xml` is included for Maven-based environments as well.
 
 ## License
 
