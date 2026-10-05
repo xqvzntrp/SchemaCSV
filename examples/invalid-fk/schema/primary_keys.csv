@@ -1,0 +1,11 @@
+table_name,key_name,column_name,position
+channel,pk_channel,code,1
+category,pk_category,channel_code,1
+category,pk_category,code,2
+field,pk_field,channel_code,1
+field,pk_field,category_code,2
+field,pk_field,code,3
+value,pk_value,channel_code,1
+value,pk_value,category_code,2
+value,pk_value,field_code,3
+value,pk_value,record_key,4

@@ -1,0 +1,15 @@
+table_name,column_name,required,position
+channel,code,true,1
+channel,name,true,2
+category,channel_code,true,1
+category,code,true,2
+category,name,true,3
+field,channel_code,true,1
+field,category_code,true,2
+field,code,true,3
+field,name,true,4
+value,channel_code,true,1
+value,category_code,true,2
+value,field_code,true,3
+value,record_key,true,4
+value,value,true,5
